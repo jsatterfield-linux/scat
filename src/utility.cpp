@@ -9,23 +9,14 @@
 
 using namespace std;
 
-
-#if 0
-double ranf(){
-  double u = genrand_real3();
-  return u; //genrand_real2();
-}
-#endif
-
-std::random_device rd2;
-std::default_random_engine eng2(rd2());
-std::uniform_real_distribution<> distr2(0.0,1.0);
+std::mt19937 eng;
+std::uniform_real_distribution<> distr(0.0, 1.0);
 
 // generate a random integer according to a user-defined density
 int rint2 ( const vector<double> & prob, double psum )
 {
     double csum = prob[0];
-    double u = distr2(eng2);
+    double u = distr(eng);
     
     if(psum == 0.0){ // return a uniform random number if all zeros
       return (int) floor(prob.size() * u);
@@ -63,7 +54,7 @@ void rperm(vector<int> & perm,int n)
   for(i=0;i<n;i++)
     {
       t=n-i-1; // t runs from n-1 down to 0
-      s=(int) floor((t+1)*distr2(eng2)); // s unif on 0 to t
+      s=(int) floor((t+1)*distr(eng)); // s unif on 0 to t
       temp=perm[s]; // swap s and t
       perm[s]=perm[t];
       perm[t]=temp;
@@ -86,8 +77,8 @@ double rnorm(double mu,double sigma)
 	double u=0,v=0,x=0,z=0;
 
 	loopstart:
-	u=distr2(eng2);
-	v=0.8578*(2*distr2(eng2)-1);
+	u=distr(eng);
+	v=0.8578*(2*distr(eng)-1);
 	x=v/u;
 	z=0.25*x*x;
 	if(z<(1-u)) goto loopend;
@@ -110,14 +101,14 @@ double rgamma(double n,double lambda)
 		const double b=(n+E)/E;
 		double p=0.0;
 		one: 
-		p=b*distr2(eng2);
+		p=b*distr(eng);
 		if(p>1) goto two;
 		x=exp(log(p)/n);
-		if(x>-log(distr2(eng2))) goto one;
+		if(x>-log(distr(eng))) goto one;
 		goto three;
 		two: 
 		x=-log((b-p)/n);
-		if (((n-1)*log(x))<log(distr2(eng2))) goto one;
+		if (((n-1)*log(x))<log(distr(eng))) goto one;
 		three:;	
 	}
 	else if(n==1.0)
@@ -128,12 +119,12 @@ double rgamma(double n,double lambda)
 		double a=0.0;
 		double u,u0,ustar;
 	ten:
-		u=distr2(eng2);
+		u=distr(eng);
 		u0=u;
 	twenty:
-		ustar=distr2(eng2);
+		ustar=distr(eng);
 		if(u<ustar) goto thirty;
-		u=distr2(eng2);
+		u=distr(eng);
 		if(u<ustar) goto twenty;
 		a++;
 		goto ten;
@@ -160,8 +151,8 @@ double rgamma(double n,double lambda)
 			if(n>2.5) c5=1/sqrt(n);
 		}
 		four:
-		u1=distr2(eng2);
-		u2=distr2(eng2);
+		u1=distr(eng);
+		u2=distr(eng);
 		if(n<=2.5) goto five;
 		u1=u2+c5*(1-1.86*u1);
 		if ((u1<=0) || (u1>=1)) goto four;

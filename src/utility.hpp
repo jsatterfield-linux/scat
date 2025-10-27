@@ -5,12 +5,12 @@
 
 #include <string>
 #include <map>
+#include <random>
 #include <vector>
 
 using namespace std;
-extern "C" void init_genrand(unsigned long s);
-extern "C" double genrand_real2(void);
-extern "C" double genrand_real3(void); // random on (0,1) instead of [0,1)
+extern std::mt19937 eng;
+extern std::uniform_real_distribution<> distr;
 
 double ranf();
 // generate a random integer according to a user-defined density

@@ -17,7 +17,6 @@
 #include <cmath>
 #include "string.h"
 #include "readboundary.hpp"
-//#include "mt19937ar.hpp"
 #include <random>
 #include <sstream>  // for ToString(foo) functions
 #include <limits>   // for ToString(foo) functions
@@ -32,11 +31,6 @@ extern "C" void dpotrf_(
 	);
 
 using namespace std; 
-    
-// random number stuff
-std::random_device rd;
-std::default_random_engine eng(rd());
-std::uniform_real_distribution<> distr(0.0,1.0);
 
 // Declarations moved here from scat3.hpp by Mary 5/10/22
 
@@ -2674,7 +2668,8 @@ int main ( int argc, char** argv)
 
   // MENU PROCESSING PHASE
   cout << "SCAT version " << VERSION << endl;
-  int SEED = 0;
+  bool seed_set = false;
+  int seed = 0;
   map<string, string> filenames; 
   while( ( argc > 1 ) && ( argv[1][0] == '-' ) ) {
     switch(argv[1][1]) {
@@ -2797,8 +2792,8 @@ int main ( int argc, char** argv)
       break;
 
     case 'S': // seed
-      ++argv; --argc; SEED = atoi(&argv[1][0]);
-      cout << "SEED " << SEED << endl;
+      ++argv; --argc; seed = atoi(&argv[1][0]); seed_set = true;
+      cout << "SEED " << seed << endl;
       break;
 
     case 'v':
@@ -2869,7 +2864,12 @@ int main ( int argc, char** argv)
     exit(1);
   }
 
-  // init_genrand(SEED);  DEBUG restore this functionality ASAP!
+  // use seed if specified on CLI, otherwise use non-deterministic seed
+  if (seed_set) {
+    eng.seed(seed);
+  } else {
+    eng.seed(std::random_device()());
+  }
 
   cout << argv[1] << endl;
   filenames["input"]  = string(argv[1]);
