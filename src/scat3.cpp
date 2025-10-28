@@ -26,25 +26,25 @@ using namespace std;
 
 // Declarations moved here from scat3.hpp by Mary 5/10/22
 
-int ECHOINPUTS = 0;
-int USESUBREGION = 0; // indicates whether region file also holds subregion data
+bool ECHOINPUTS = false;
+bool USESUBREGION = false; // indicates whether region file also holds subregion data
 int NSUBREGION = 8;
 
 int PSEUDOCOUNT = 0;
-int LOCATE = 0; // whether to try to estimate the position of a particular sample
-int ASSIGNFILE = 0;
+bool LOCATE = false; // whether to try to estimate the position of a particular sample
+bool ASSIGNFILE = false;
 int SAMPLETOLOCATE = 0;
 int FIRSTSAMPLETOLOCATE=0;
 int LASTSAMPLETOLOCATE=-1;
-int LOCATEWHOLEREGION = 0;
-int INCLUDENUGGET = 0;
+bool LOCATEWHOLEREGION = false;
+bool INCLUDENUGGET = false;
 int SKIPCOL = 0;
 
-int READBOUNDARY = 0;
-int READGRID = 0;
+bool READBOUNDARY = false;
+bool READGRID = false;
 
-int PERMUTE = 1;
-int VERBOSE = 0;
+bool PERMUTE = true;
+bool VERBOSE = false;
 
 double TEMPERATURE = 1; //0.0001;
 double ALPHAUPDATESD = 0.4;
@@ -53,27 +53,27 @@ int ALPHALENGTH = 3+INCLUDENUGGET;
 double DELTA = 0.05; //0.05; //0.1; // prob of genotyping error in this one sample (set to 0 for no error)
 double NULLPROB = 0; // 0.1;// prob of null allele
 int TRUEREGION; // stores true region of the sample to be located
-int CHEAT = 0; // stores whether to cheat by starting estimates at the true location
-int NONUNIFORMPRIOR = 0; // non-uniform prior weights sample as being more
+bool CHEAT = false; // stores whether to cheat by starting estimates at the true location
+bool NONUNIFORMPRIOR = false; // non-uniform prior weights sample as being more
 // likely to be near one of the sampling locations
-int REMOVEREGION = 0;
+bool REMOVEREGION = false;
 
-int USELANGEVIN = 0;
-int USESPATIAL =1;
+bool USELANGEVIN = false;
+bool USESPATIAL = true;
 int HYBRIDCHECK = 0;
 
-int UPDATEALPHA =1;
-int INITALPHA = 0;
-int UPDATEMU = 1;
-int UPDATENU = 1;
-int UPDATEBETA = 1;
-int UPDATEX = 1;
+bool UPDATEALPHA = true;
+// int INITALPHA = 0; // 2025-10-28: Dead-code
+bool UPDATEMU = true;
+bool UPDATENU = true;
+bool UPDATEBETA = true;
+bool UPDATEX = true;
 
-int FORESTONLY = 0;
-int SAVANNAHONLY = 0;
+bool FORESTONLY = false;
+bool SAVANNAHONLY = false;
 
-int OUTPUTX = 0;
-int UPDATEJOINT = 0;
+bool OUTPUTX = false;
+bool UPDATEJOINT = false;
 
 double XPROPOSALFACTOR = 0.5; // factor by which to multiply sd
 double YPROPOSALFACTOR = 0.5;
@@ -623,7 +623,7 @@ static void input_positions_data( ifstream & input, vector<double> & x, vector<d
     input >> regname;
     if (!input.good()) break;   // DEBUG added by Mary as last line was read twice?
     input >> regnum;
-    if(USESUBREGION == 1)
+    if(USESUBREGION)
       input >> subregion;
     // note inversion in these two lines, related to the general inverted lat/long issue throughout
     // this program
@@ -2219,11 +2219,11 @@ static void update_XJoint(vector<double> & Alpha, DoubleVec4d& X, const DoubleVe
 	double LogLikRatio = 0;
 	for(int r=0; r<NREGION; r++){
 	  double propmean = X[r][k][l][j]; // proposal mean
-	  if(USELANGEVIN == 1)
+	  if(USELANGEVIN)
 	    propmean += (h*h/2)*(divLogLikValue(r,k,l,j,ExpTheta,SumExpTheta,Count,SumCount,L)- Alpha[0]* X[r][k][l][j]);
 	  NewX[r] = rnorm(propmean,h);
 	  LogLikRatio += 0.5*Alpha[0]*((X[r][k][l][j]*X[r][k][l][j]) - (NewX[r]*NewX[r])); // this is the "prior" part of the acceptance ratio
-	  if(USELANGEVIN == 1)
+	  if(USELANGEVIN)
 	    LogLikRatio += 0.5* (NewX[r] - propmean)*  (NewX[r] - propmean)/(h*h); // bottom part of Hastings ratio X -> NewX
 	} 
 	
@@ -2243,7 +2243,7 @@ static void update_XJoint(vector<double> & Alpha, DoubleVec4d& X, const DoubleVe
 	  LogLikRatio += (NewLogLik[r] - LogLik[r][k][l])/TEMPERATURE; // Likelihood ratio part of acceptance ratio
 	}
 	
-	if(USELANGEVIN == 1){ // compute top part of Hastings ratio (H ratio is 1 if Langevin updates not used)
+	if(USELANGEVIN){ // compute top part of Hastings ratio (H ratio is 1 if Langevin updates not used)
 	  for(int r=0; r<NREGION; r++){ 
 	    // backpropmean is the proposal mean when going from NewX
 	    NewdivLogLik = calcNewdivLogLik(r,k,l,j,NewExpTheta,NewSumExpTheta,Count,SumCount,L);
@@ -2303,12 +2303,12 @@ static void update_XSingle(vector<double> & Alpha, DoubleVec4d& X, DoubleVec4d& 
 	  double LogLikRatio = 0;
 	  double propmean = X[r][k][l][j]; // proposal mean
 	  
-	  if(USELANGEVIN == 1) 
+	  if(USELANGEVIN) 
 	    propmean += (h*h/2)*(divLogLikValue(r,k,l,j,ExpTheta,SumExpTheta,Count,SumCount,L) - Alpha[0] * X[r][k][l][j]);
 	  
 	  NewX = rnorm(propmean,h);
 	  LogLikRatio += 0.5* Alpha[0] * ( X[r][k][l][j] * X[r][k][l][j] - NewX * NewX); // this is the "prior" part of the acceptance ratio
-	  if(USELANGEVIN == 1)
+	  if(USELANGEVIN)
 	    LogLikRatio += 0.5* (NewX - propmean)*  (NewX - propmean)/(h*h); // bottom part of Hastings ratio X -> NewX
 	
 	
@@ -2323,7 +2323,7 @@ static void update_XSingle(vector<double> & Alpha, DoubleVec4d& X, DoubleVec4d& 
 	    LogLikRatio += (NewLogLik[s] - LogLik[s][k][l])/TEMPERATURE; // Likelihood ratio part of acceptance ratio
 	  }
 	  
-	  if(USELANGEVIN == 1){ // compute top part of Hastings ratio (H ratio is 1 if Langevin updates not used)
+	  if(USELANGEVIN){ // compute top part of Hastings ratio (H ratio is 1 if Langevin updates not used)
 	      // backpropmean is the proposal mean when going from NewX
 	    NewdivLogLik = calcNewdivLogLik(r,k,l,j,NewExpTheta,NewSumExpTheta,Count,SumCount,L);
 	    double backpropmean = NewX + (h*h/2) * (NewdivLogLik - Alpha[0] * NewX);
@@ -2405,21 +2405,21 @@ static void update_YSingle(vector<double> & Delta, DoubleVec2d& Y, DoubleVec2d& 
 
 static void DoAllUpdates(DoubleVec4d& X, double & Beta,  vector<double> & Gamma, vector<double> & Alpha, DoubleVec2d& Mu, DoubleVec3d& Nu, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& LogLik, DoubleVec3d& SumExpTheta, IntVec4d& Count, IntVec3d& SumCount, DoubleVec1d& L, vector<vector<vector<int> > > & Genotype, vector<int> & Region, vector<int> & Species, vector<vector<double> > & Pi, vector<double> & Xcoord, vector<double> & Ycoord, DoubleVec2d& Y, double & Eta, vector<double> & Delta, DoubleVec1d& Lambda, DoubleVec2d& Psi, DoubleVec2d& ExpPsi, DoubleVec1d& SumExpPsi, DoubleVec1d& M, vector<double> & BoundaryX, vector<double> & BoundaryY, const Mapgrid& mymapgrid )
 {
-  if(UPDATEBETA ==1)
+  if(UPDATEBETA)
     update_Beta(Beta,Mu);
   if(UPDATEX){
-    if(UPDATEJOINT ==1)
+    if(UPDATEJOINT)
       update_XJoint(Alpha,X,Mu,Nu,Theta,ExpTheta,LogLik,SumExpTheta,Count,SumCount,L);
     else
       update_XSingle(Alpha, X,Theta,ExpTheta,LogLik,SumExpTheta,Count,SumCount,L);
   }
-  if(UPDATEALPHA ==1)
+  if(UPDATEALPHA)
     update_Alpha(Alpha,X,Mu,Nu,Theta,ExpTheta,LogLik,SumExpTheta,Count,SumCount,L,Xcoord,Ycoord);
 
-  if(UPDATEMU == 1)
+  if(UPDATEMU)
     update_Mu(Mu,Beta,Theta,ExpTheta,LogLik,SumExpTheta,Count,SumCount);
 
-  if(UPDATENU == 1){
+  if(UPDATENU){
     update_Nu(Nu,Gamma,Theta,ExpTheta,LogLik,SumExpTheta,Count,SumCount);
     for(int k=0; k<NSPECIES; k++)
       update_Beta(Gamma[k],Nu[k]);
@@ -2480,7 +2480,7 @@ static void Initialise(DoubleVec4d& X, double & Beta,  vector<double> & Gamma, v
   
   for(int l=0; l<NLOCI; l++){
     for(int j=0; j<Nallele[l]; j++){
-      if(UPDATEMU==1){
+      if(UPDATEMU){
 	Mu[l][j] = rnorm(0,sqrt(1.0/Beta));
       }
       else
@@ -2490,7 +2490,7 @@ static void Initialise(DoubleVec4d& X, double & Beta,  vector<double> & Gamma, v
   for(int k=0; k<NSPECIES; k++){
     for(int l=0; l<NLOCI; l++){
       for(int j=0; j<Nallele[l]; j++){
-	if(UPDATENU==1)
+	if(UPDATENU)
 	  Nu[k][l][j] = rnorm(0,1.0/sqrt(Gamma[k]));
 	else
 	  Nu[k][l][j] = 0;
@@ -2502,7 +2502,7 @@ static void Initialise(DoubleVec4d& X, double & Beta,  vector<double> & Gamma, v
     for(int k=0; k<NSPECIES; k++){
       for(int l=0; l<NLOCI; l++){
 	for(int j=0;j<Nallele[l];j++){	 
-	  if(UPDATEX==1)
+	  if(UPDATEX)
 	    X[r][k][l][j] = rnorm(0,sqrt(1.0/Alpha[0])); //rnorm(0,1);
 	  else
 	    X[r][k][l][j] = 0;
@@ -2616,7 +2616,7 @@ int main ( int argc, char** argv)
       break;
 
     case 'A': // estimate the location of a sample
-      LOCATE = 1;
+      LOCATE = true;
       ++argv; --argc; FIRSTSAMPLETOLOCATE = atoi(&argv[1][0])-1;
       ++argv; --argc; LASTSAMPLETOLOCATE = atoi(&argv[1][0])-1;
       cout << "Locating Samples " << FIRSTSAMPLETOLOCATE+1 << " to " <<  LASTSAMPLETOLOCATE+1 << endl;
@@ -2624,13 +2624,13 @@ int main ( int argc, char** argv)
       break;
  
     case 'b': // don't update beta
-      UPDATEBETA = 0;
+      UPDATEBETA = false;
       break;
 
     case 'B': // read in boundary file 
       // this is the "no space" syntax
       filenames["boundaryfile"] = argv[1]+2;
-      READBOUNDARY = 1; 
+      READBOUNDARY = true; 
       break;
 
     case 'C':
@@ -2638,11 +2638,11 @@ int main ( int argc, char** argv)
       break;
 
     case 'D':
-      FORESTONLY = 1;
+      FORESTONLY = true;
       break;
 
     case 'd':
-      SAVANNAHONLY = 1;
+      SAVANNAHONLY = true;
       break;
 
     case 'e':
@@ -2651,12 +2651,12 @@ int main ( int argc, char** argv)
       break;
 
     case 'E':
-      ECHOINPUTS = 1;
+      ECHOINPUTS = true;
       break;
 
     case 'f': // fix alpha and beta, to values given in subsequent arguments
-      UPDATEALPHA = 0;
-      UPDATEBETA = 0;
+      UPDATEALPHA = false;
+      UPDATEBETA = false;
       ++argv;--argc; ALPHA0 = atof(&argv[1][0]);
       ++argv;--argc; ALPHA1 = atof(&argv[1][0]);    
       ++argv;--argc; ALPHA2 = atof(&argv[1][0]);
@@ -2665,7 +2665,7 @@ int main ( int argc, char** argv)
 
     case 'g': // read in grid file, replacement for a boundary file
       ++argv; --argc; filenames["gridfile"] = string(argv[1]);
-      READGRID = 1;
+      READGRID = true;
       cout << "-g " << filenames["gridfile"] << endl;
       break;
 
@@ -2687,22 +2687,22 @@ int main ( int argc, char** argv)
       break;
       
     case 'I': // don't permute the regions - use input order
-      PERMUTE = 0;
+      PERMUTE = false;
       break;
    
     case 'j': // update x jointly
-      UPDATEJOINT = 1;
+      UPDATEJOINT = true;
       break;
 
     case 'M': // filename of samples to be assigned
       // this is the "no space" syntax
-      ASSIGNFILE = 1;
+      ASSIGNFILE = true;
       filenames["assignfile"] = argv[1]+2;
       break;
 		
     case 'm': // fix mu to be 0 (mimic "indep frequencies" model)
-      UPDATEMU = 0;
-      UPDATEBETA = 0;
+      UPDATEMU = false;
+      UPDATEBETA = false;
       break;
 
     case 'n':
@@ -2712,7 +2712,7 @@ int main ( int argc, char** argv)
       break;
 
     case 'N':
-      INCLUDENUGGET = 1;
+      INCLUDENUGGET = true;
       break;
 
     case 'p':
@@ -2721,11 +2721,11 @@ int main ( int argc, char** argv)
       break;
 
     case 'r': // not random walk
-      USELANGEVIN = 1;
+      USELANGEVIN = true;
       break;
 
     case 'R': // remove all samples from a region when doing location
-      REMOVEREGION = 1;
+      REMOVEREGION = true;
       break;
 
     case 'S': // seed
@@ -2735,30 +2735,30 @@ int main ( int argc, char** argv)
 
     case 'v':
       // this is the "no space" syntax
-      VERBOSE = 1;
-      OUTPUTX = 1;
+      VERBOSE = true;
+      OUTPUTX = true;
       filenames["Xfile"] = argv[1]+2;
       break;
 
     case 'w': // don't use spatial smoothing
-      USESPATIAL = 0;
+      USESPATIAL = false;
       break;
 
     case 'W': // locate whole region
-      LOCATEWHOLEREGION = 1;
+      LOCATEWHOLEREGION = true;
       break;
 
     case 'x': // nonuniformprior
-      NONUNIFORMPRIOR = 1;
+      NONUNIFORMPRIOR = true;
       break;
     
     case 'X': // start location close to true location
-      CHEAT = 1;
+      CHEAT = true;
       break;
       
     case 'Z' : // include subregion info in location file
       cout << "-Z" << endl;
-      USESUBREGION = 1;
+      USESUBREGION = true;
       break;
 
     default: 
@@ -2781,9 +2781,9 @@ int main ( int argc, char** argv)
   }
   
   
-  if(ASSIGNFILE==1)
+  if(ASSIGNFILE)
 	  if(HYBRIDCHECK==0)
-		  LOCATE = 1;
+		  LOCATE = true;
   
   if(LOCATE) {
     if(LASTSAMPLETOLOCATE < 0)
@@ -2835,7 +2835,7 @@ int main ( int argc, char** argv)
   }
   
   if(NSPECIES == 1)
-    UPDATENU = 0;
+    UPDATENU = false;
 
   ifstream input (filenames["input"].c_str());
   if(!input.is_open()) {
@@ -3187,8 +3187,8 @@ int main ( int argc, char** argv)
   double totaliter = 0; // number of iterations used in computing mean frequencies
  
   // start by doing burn-in (whether or not cross-validating)
-  int templocate = LOCATE;
-  LOCATE = 0; // don't locate during burnin
+  bool templocate = LOCATE;
+  LOCATE = false; // don't locate during burnin
 
   int printdot = max(Nburn * SCREENPROGRESS_INTERVAL,1.0);
   int printincr = printdot;
@@ -3218,7 +3218,7 @@ int main ( int argc, char** argv)
 
       OutputParameters(paramfile,Alpha,Beta,Gamma,Delta,Eta,Lambda,LogLik);
 
-      if(OUTPUTX==1){
+      if(OUTPUTX){
 	for(int r=0; r < NREGION; r++){
 	  for(int a =0; a<Nallele[0]; a++){
 	    Xfile << X[r][0][0][a]  << " ";
@@ -3476,7 +3476,7 @@ int main ( int argc, char** argv)
       OutputParameters(paramfile, Alpha, Beta, Gamma, Delta, Eta, Lambda, LogLik);
 
 
-      if(OUTPUTX==1){
+      if(OUTPUTX){
 	for(int r=0; r < NREGION; r++){
 	  for(int a =0; a<Nallele[0]; a++){
 	    Xfile << X[r][0][0][a] << " ";
