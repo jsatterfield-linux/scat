@@ -5,7 +5,7 @@ CXX     = g++
 CFLAGS = -O3 -DNDEBUG $(INCLUDE)
 CXXFLAGS = $(CFLAGS) -std=gnu++11
 
-LDFLAGS = -llapack
+LDFLAGS =
 OBJ2 = scat3.o utility.o readboundary.o
 
 .SUFFIXES: .hpp .cpp .o

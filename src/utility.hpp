@@ -12,7 +12,6 @@ using namespace std;
 extern std::mt19937 eng;
 extern std::uniform_real_distribution<> distr;
 
-double ranf();
 // generate a random integer according to a user-defined density
 int rint2 ( const std::vector<double> & , double psum = -1.0 );
 double rgamma(double n,double lambda);
