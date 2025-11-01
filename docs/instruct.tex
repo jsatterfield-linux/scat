@@ -139,17 +139,16 @@ are given below. Finally you must create a directory or folder to hold your resu
 
 Once these files are created you can run the program
 using
-$$\text{{\tt ./SCAT2 <genotype filename> <location filename> <outputdir> L}}$$ where {\tt L} is the number of loci in the genotype file.
+$$\text{{\tt ./src/SCAT3 <genotype filename> <location filename> <outputdir> L}}$$ where {\tt L} is the number of loci in the genotype file.
 
-An example genotype file ({\tt test.genotype.toutputdirxt})
+An example genotype file ({\tt test.genotype.txt})
 and an example location file {\tt test.location.txt} are supplied with
 the software.  You can run the program on the test data supplied by
 typing
 
 $$ \text{mkdir results}\\
-\text{{\tt ./SCAT2 test.genotype.txt test.location.txt results 2}}$$ 
-(make sure that {\tt SCAT2}, {\tt test.genotype.txt}, and {\tt
-test.location.txt} are all in the current directory.)  Here 2 indicates that there are 2
+\text{{\tt ./src/SCAT3 tests/test.genotype.txt tests/test.location.txt results 2}}$$ 
+(make sure that {\tt SCAT3} is in the current directory.)  Here 2 indicates that there are 2
 loci in the genotype file.
 
 The program will input the data, perform a number of iterations, and

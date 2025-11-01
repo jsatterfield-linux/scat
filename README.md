@@ -23,5 +23,5 @@ make
 ##Run on example data
 ```
  cd src/
- ./SCAT3 ../docs/test.genotype.txt ../docs/test.location.txt . 2
+ ./SCAT3 ../tests/test.genotype.txt ../tests/test.location.txt . 2
 ```
