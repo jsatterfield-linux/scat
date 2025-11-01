@@ -39,6 +39,4 @@ const int ValidateAssumptions = 1;
 
 const double EPSILON = 1e-100;
 
-const int DELTALENGTH = 3;
-
 #endif  // SCAT2_HPP
