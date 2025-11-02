@@ -205,31 +205,25 @@ struct Config {
   std::string xFile = "";
 };
 
-int SAMPLETOLOCATE = 0;
+struct AcceptanceStat {
+  int attempt = 0;
+  int accept = 0;
+};
 
-int TRUEREGION; // stores true region of the sample to be located
+struct State {
+  std::array<AcceptanceStat, 4> alpha;
+  std::array<AcceptanceStat, 3> delta;
+  AcceptanceStat lambda;
+  AcceptanceStat mu;
+  AcceptanceStat nu;
+  AcceptanceStat loc;
+  AcceptanceStat x;
+  AcceptanceStat y;
 
-std::array<int, 4> ALPHAATTEMPT = { 0 };
-std::array<int, 4> ALPHAACCEPT = { 0 };
-std::array<int, 3> DELTAATTEMPT = { 0 };
-std::array<int, 3> DELTAACCEPT = { 0 };
-int XACCEPT =0;
-int XATTEMPT = 0;
-
-int MUACCEPT = 0;
-int MUATTEMPT =0;
-
-int NUACCEPT = 0;
-int NUATTEMPT =0;
-
-int YACCEPT =0;
-int YATTEMPT = 0;
-
-int LAMBDAACCEPT = 0;
-int LAMBDAATTEMPT =0;
-
-int LOCATTEMPT = 0;
-int LOCACCEPT = 0;
+  int sampleToLocate = 0;
+  // stores true region of the sample to be located
+  int trueRegion;
+};
 
 // end of moved declarations
 
@@ -409,7 +403,7 @@ static int IsInsideBoundary( double x, double y, const DoubleVec1d& BoundaryX, c
 }
 //===================================================================
 
-static void InitialiseXY(const Config& config, vector<double> & BoundaryX, vector<double> & BoundaryY, vector<double> & Xcoord, vector<double> & Ycoord, const Mapgrid& mymapgrid)
+static void InitialiseXY(const Config& config, const State& state, vector<double> & BoundaryX, vector<double> & BoundaryY, vector<double> & Xcoord, vector<double> & Ycoord, const Mapgrid& mymapgrid)
 {
   if (config.forestOnly) {
     Xcoord[config.numRegion - 1] = 0.2;
@@ -418,8 +412,8 @@ static void InitialiseXY(const Config& config, vector<double> & BoundaryX, vecto
     Xcoord[config.numRegion - 1] = 0.52;
     Ycoord[config.numRegion - 1] = -0.17;
   } else if (config.cheat) {
-    Xcoord[config.numRegion - 1] = Xcoord[TRUEREGION] + rnorm(0, 0.001); // these lines "cheat" by starting with 
-    Ycoord[config.numRegion - 1] = Ycoord[TRUEREGION] + rnorm(0, 0.001); // initial guess close to true location
+    Xcoord[config.numRegion - 1] = Xcoord[state.trueRegion] + rnorm(0, 0.001); // these lines "cheat" by starting with 
+    Ycoord[config.numRegion - 1] = Ycoord[state.trueRegion] + rnorm(0, 0.001); // initial guess close to true location
   } else {
 // The commented out code picks a random origin near the center of the reference
 // regions.  This can sometimes fail.  I replace it with picking a random reference
@@ -662,29 +656,27 @@ static void OutputRegionNames(const Config& config, ostream & freqFile, const ve
   freqFile << endl;
 }
 
+static void outputAcceptanceRate(const AcceptanceStat& stat, std::ostream& ostr, bool leadingSpace = true) {
+  if (stat.attempt > 0) {
+    if (leadingSpace)
+      ostr << " ";
+    ostr << (double)stat.accept / (double)stat.attempt;
+  }
+}
 
-static void OutputAcceptRates(const Config& config, ostream & ostr)
+static void OutputAcceptRates(const Config& config, const State& state, std::ostream& ostr)
 {
-  for (int alphaparam = 1; alphaparam < config.alphaLen; alphaparam++) {
-    if(ALPHAATTEMPT[alphaparam] >0)
-      ostr << (1.0*ALPHAACCEPT[alphaparam])/ALPHAATTEMPT[alphaparam] << " ";
-  }
-  if(XATTEMPT >0)
-    ostr << " " << (1.0*XACCEPT)/XATTEMPT;
-  if(MUATTEMPT > 0)
-    ostr << " " << (1.0*MUACCEPT)/MUATTEMPT;
-  if(NUATTEMPT>0)
-    ostr << " " << (1.0*NUACCEPT)/NUATTEMPT;
-  
-  for(int deltaparam =0; deltaparam < config.alphaLen; deltaparam++){
-    if(DELTAATTEMPT[deltaparam] > 0)
-      ostr << (1.0*DELTAACCEPT[deltaparam])/DELTAATTEMPT[deltaparam] << " ";
-  }
-  if(YATTEMPT>0)
-    ostr << " " <<  (1.0*YACCEPT)/YATTEMPT;
-  if(LAMBDAATTEMPT>0)
-    ostr << " " << (1.0*LAMBDAACCEPT)/LAMBDAATTEMPT;
-  ostr << endl;
+  outputAcceptanceRate(state.alpha[1], ostr, false);
+  for (int alphaparam = 2; alphaparam < config.alphaLen; alphaparam++)
+    outputAcceptanceRate(state.alpha[alphaparam], ostr);
+  outputAcceptanceRate(state.x, ostr);
+  outputAcceptanceRate(state.mu, ostr);
+  outputAcceptanceRate(state.nu, ostr);  
+  for (int deltaparam = 0; deltaparam < config.deltaLen; deltaparam++)
+    outputAcceptanceRate(state.delta[deltaparam], ostr);
+  outputAcceptanceRate(state.y, ostr);
+  outputAcceptanceRate(state.lambda, ostr);
+  ostr << std::endl;
 }    
 
 static void output_positions_data(const vector<string> & RegionName, const vector<int> & Region, const vector<double> & x, const vector<double> & y, const vector<string> & Id){
@@ -1581,7 +1573,7 @@ static void update_Pi(const Config& config, vector< vector<double> > & Pi, vecto
 
 
 // update Nu (the species-specific adjustment to the background "ancestral" allele freqs)
-static void update_Nu(const Config& config, DoubleVec3d& Nu, vector<double> & Gamma, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& LogLik, DoubleVec3d& SumExpTheta, const IntVec4d& Count, const IntVec3d& SumCount)
+static void update_Nu(const Config& config, State& state, DoubleVec3d& Nu, vector<double> & Gamma, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& LogLik, DoubleVec3d& SumExpTheta, const IntVec4d& Count, const IntVec3d& SumCount)
 {
 
   double NewNu;
@@ -1608,9 +1600,9 @@ static void update_Nu(const Config& config, DoubleVec3d& Nu, vector<double> & Ga
         }
 
         double A = exp(LogLikRatio); // acceptance prob
-	NUATTEMPT +=1;
+	state.nu.attempt +=1;
 	if(distr(eng)<A ){ //accept move 
-	  NUACCEPT +=1;
+	  state.nu.accept += 1;
           for (int r = 0; r < config.numRegion; r++) {
             Theta[r][k][l][j] = NewTheta[r][k];
 	    ExpTheta[r][k][l][j] = NewExpTheta[r][k];
@@ -1626,7 +1618,7 @@ static void update_Nu(const Config& config, DoubleVec3d& Nu, vector<double> & Ga
 
 
 // update Mu (the background "ancestral" allele freqs)
-static void update_Mu(const Config& config, DoubleVec2d& Mu, double Beta, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& LogLik, DoubleVec3d& SumExpTheta, const IntVec4d& Count, const IntVec3d& SumCount)
+static void update_Mu(const Config& config, State& state, DoubleVec2d& Mu, double Beta, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& LogLik, DoubleVec3d& SumExpTheta, const IntVec4d& Count, const IntVec3d& SumCount)
 {
   static DoubleVec2d NewTheta(config.numRegion,DoubleVec1d(config.numSpecies,0.0));
   static DoubleVec2d NewExpTheta(config.numRegion,DoubleVec1d(config.numSpecies,0.0));
@@ -1654,9 +1646,9 @@ static void update_Mu(const Config& config, DoubleVec2d& Mu, double Beta, Double
 
       double A = exp(LogLikRatio); // acceptance prob
 
-      MUATTEMPT +=1;
+      state.mu.attempt += 1;
       if(distr(eng)<A ){ //accept move 
-	MUACCEPT +=1;
+	      state.mu.accept +=1;
         for (int r = 0; r < config.numRegion; r++) {
           for (int k = 0; k < config.numSpecies; k++) {
             Theta[r][k][l][j] = NewTheta[r][k];
@@ -1672,7 +1664,7 @@ static void update_Mu(const Config& config, DoubleVec2d& Mu, double Beta, Double
 }
 
 // update Lambda (the background species abundance)
-static void update_Lambda(const Config& config, DoubleVec1d& Lambda, double Eta, DoubleVec2d& Psi, DoubleVec2d& ExpPsi, DoubleVec1d& SumExpPsi, vector<int> & Region, vector<int> & Species)
+static void update_Lambda(const Config& config, State& state, DoubleVec1d& Lambda, double Eta, DoubleVec2d& Psi, DoubleVec2d& ExpPsi, DoubleVec1d& SumExpPsi, vector<int> & Region, vector<int> & Species)
 {
   static DoubleVec1d NewPsi(config.numRegion,0.0);
   static DoubleVec1d NewExpPsi(config.numRegion,0.0);
@@ -1700,9 +1692,9 @@ static void update_Lambda(const Config& config, DoubleVec1d& Lambda, double Eta,
 
     double A = exp(LogLikRatio); // acceptance prob
         
-    LAMBDAATTEMPT +=1;
+    state.lambda.attempt += 1;
     if(distr(eng)<A ){ //accept move 
-      LAMBDAACCEPT +=1;
+      state.lambda.accept +=1;
       for (int r = 0; r < config.numRegion; r++) {
         Psi[r][k] = NewPsi[r];
 	ExpPsi[r][k] = NewExpPsi[r];
@@ -1914,7 +1906,7 @@ static bool InForest(double x,double y){
 // after each call to this function, which was an accident waiting to
 // happen.  It now uses internal storage only.  -- Mary 12/30/2020
 
-static void update_Location(const Config& config, vector<double> & Alpha, const DoubleVec4d& X, const DoubleVec2d& Mu, const DoubleVec3d& Nu, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& SumExpTheta, DoubleVec3d& LogLik, DoubleVec1d& L, const IntVec4d& Count, const IntVec3d& SumCount, vector<double> & Xcoord, vector<double> & Ycoord, vector<int> & Species, vector<vector<vector<int> > > & Genotype, vector<int> & Region, vector<double> & BoundaryX, vector<double> & BoundaryY, const Mapgrid& mymapgrid)
+static void update_Location(const Config& config, State& state, vector<double> & Alpha, const DoubleVec4d& X, const DoubleVec2d& Mu, const DoubleVec3d& Nu, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& SumExpTheta, DoubleVec3d& LogLik, DoubleVec1d& L, const IntVec4d& Count, const IntVec3d& SumCount, vector<double> & Xcoord, vector<double> & Ycoord, vector<int> & Species, vector<vector<vector<int> > > & Genotype, vector<int> & Region, vector<double> & BoundaryX, vector<double> & BoundaryY, const Mapgrid& mymapgrid)
 {
   // has memory for NewTheta and NewExpTheta already been allocated?
   static bool already_allocated(false);
@@ -1992,7 +1984,7 @@ static void update_Location(const Config& config, vector<double> & Alpha, const 
     calc_L(config,NewL,Alpha,NewXcoord,NewYcoord);
 
     int r = config.numRegion - 1;
-    int k = Species[SAMPLETOLOCATE];
+    int k = Species[state.sampleToLocate];
 
     for (int l = 0; l < config.numLoci; l++) {
       NewSumExpTheta[l] = 0;
@@ -2046,14 +2038,14 @@ static void update_Location(const Config& config, vector<double> & Alpha, const 
       newtempprob *= exp(NewLogLik[l]);
     }
 
-    LOCATTEMPT +=1;
+    state.loc.attempt += 1;
     double A = exp(LogLikRatio); // acceptance prob
     
     // test
     if(distr(eng)<A ){ //accept move
       // DEBUG
       //TRACEFILE << to_degrees(NewXcoord[config.numRegion - 1]) << " " << to_degrees(NewYcoord[config.numRegion-1]) << " Accept" << endl;
-      LOCACCEPT +=1;
+      state.loc.accept +=1;
        Xcoord = NewXcoord;
        Ycoord = NewYcoord;
        for (int r0 = 0; r0 < config.numRegion; r0++) {
@@ -2081,7 +2073,7 @@ static void update_Location(const Config& config, vector<double> & Alpha, const 
 
 
 // update the parameters in the covariance matrix 
-static void update_Alpha(const Config& config, vector<double> & Alpha, const DoubleVec4d& X, const DoubleVec2d& Mu, const DoubleVec3d& Nu, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& LogLik, DoubleVec3d& SumExpTheta, const IntVec4d& Count, const IntVec3d& SumCount, DoubleVec1d& L, vector<double> & Xcoord, vector<double> & Ycoord)
+static void update_Alpha(const Config& config, State& state, vector<double> & Alpha, const DoubleVec4d& X, const DoubleVec2d& Mu, const DoubleVec3d& Nu, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& LogLik, DoubleVec3d& SumExpTheta, const IntVec4d& Count, const IntVec3d& SumCount, DoubleVec1d& L, vector<double> & Xcoord, vector<double> & Ycoord)
 {
   // have we already arranged memory for NewTheta and NewExpTheta?
   static bool already_allocated(false);
@@ -2122,7 +2114,7 @@ static void update_Alpha(const Config& config, vector<double> & Alpha, const Dou
   update_Alpha0(config, Alpha, X);
 
   for (int alphaparam = 1; alphaparam < config.alphaLen; alphaparam++) {
-    ALPHAATTEMPT[alphaparam] +=1;
+    state.alpha[alphaparam].attempt += 1;
     vector<double> NewAlpha(Alpha);
   
     double LogLikRatio = 0;
@@ -2178,7 +2170,7 @@ static void update_Alpha(const Config& config, vector<double> & Alpha, const Dou
     double A = exp(LogLikRatio); // acceptance prob
     
     if(distr(eng)<A ){ //accept move 
-      ALPHAACCEPT[alphaparam] +=1;
+      state.alpha[alphaparam].accept += 1;
       Alpha[alphaparam] = NewAlpha[alphaparam];
       for (int r = 0; r < config.numRegion; r++) {
         for (int s = 0; s < config.numRegion; s++) {
@@ -2204,7 +2196,7 @@ static void update_Alpha(const Config& config, vector<double> & Alpha, const Dou
 
 }
 // update the parameters in the covariance matrix M 
-static void update_Delta(const Config& config, vector<double> & Delta, const DoubleVec2d& Y, const DoubleVec1d& Lambda, DoubleVec2d& Psi, DoubleVec2d& ExpPsi, DoubleVec1d& SumExpPsi, vector<int> & Species, vector<int> & Region, DoubleVec1d& M, vector<double> & Xcoord, vector<double> & Ycoord)
+static void update_Delta(const Config& config, State& state, vector<double> & Delta, const DoubleVec2d& Y, const DoubleVec1d& Lambda, DoubleVec2d& Psi, DoubleVec2d& ExpPsi, DoubleVec1d& SumExpPsi, vector<int> & Species, vector<int> & Region, DoubleVec1d& M, vector<double> & Xcoord, vector<double> & Ycoord)
 {
   // These don't need initialization as it's handled inline
   static DoubleVec2d NewPsi(config.numRegion,DoubleVec1d(config.numSpecies,0.0));
@@ -2216,7 +2208,7 @@ static void update_Delta(const Config& config, vector<double> & Delta, const Dou
   update_Delta0(config, Delta, Y);
 
   for (int deltaparam = 1; deltaparam < config.deltaLen; deltaparam++) {
-    DELTAATTEMPT[deltaparam] +=1;
+    state.delta[deltaparam].attempt +=1;
     vector<double> NewDelta(Delta);
   
     double LogLikRatio = 0;
@@ -2264,7 +2256,7 @@ static void update_Delta(const Config& config, vector<double> & Delta, const Dou
     double A = exp(LogLikRatio); // acceptance prob
     
     if(distr(eng)<A ){ //accept move 
-      DELTAACCEPT[deltaparam] +=1;
+      state.delta[deltaparam].accept += 1;
       Delta[deltaparam] = NewDelta[deltaparam];
       for (int r = 0; r < config.numRegion; r++) {
         for (int s = 0; s < config.numRegion; s++) {
@@ -2303,7 +2295,7 @@ static double calcNewdivLogLik(const Config& config, int r, int k, int l, int j,
 
 
 // update the Xs for a particular allele and locus, in a particular species, across all regions at once
-static void update_XJoint(const Config& config, vector<double> & Alpha, DoubleVec4d& X, const DoubleVec2d& Mu, const DoubleVec3d& Nu, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& LogLik, DoubleVec3d& SumExpTheta, const IntVec4d& Count, const IntVec3d& SumCount, DoubleVec1d& L)
+static void update_XJoint(const Config& config, State& state, vector<double> & Alpha, DoubleVec4d& X, const DoubleVec2d& Mu, const DoubleVec3d& Nu, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& LogLik, DoubleVec3d& SumExpTheta, const IntVec4d& Count, const IntVec3d& SumCount, DoubleVec1d& L)
 {
 
   // These do not need initialization as are initialized at use
@@ -2355,12 +2347,12 @@ static void update_XJoint(const Config& config, vector<double> & Alpha, DoubleVe
           }
         }
 	double A = exp(LogLikRatio); // acceptance prob
-	XATTEMPT +=1;
+	state.x.attempt += 1;
 	
 	if(distr(eng)<A ){ //accept move 
-	  XACCEPT +=1;
-          for (int r = 0; r < config.numRegion; r++) {
-            Theta[r][k][l][j] = NewTheta[r];
+	  state.x.accept +=1;
+    for (int r = 0; r < config.numRegion; r++) {
+      Theta[r][k][l][j] = NewTheta[r];
 	    ExpTheta[r][k][l][j] = NewExpTheta[r];
 	    SumExpTheta[r][k][l] = NewSumExpTheta[r];
 	    X[r][k][l][j] = NewX[r];
@@ -2373,7 +2365,7 @@ static void update_XJoint(const Config& config, vector<double> & Alpha, DoubleVe
 }
 
 // update each X individually (better acceptance rate/ larger proposal variance,// but more likelihood evaluations!)
-static void update_XSingle(const Config& config, vector<double> & Alpha, DoubleVec4d& X, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& LogLik, DoubleVec3d& SumExpTheta, const IntVec4d& Count, const IntVec3d& SumCount, DoubleVec1d&  L)
+static void update_XSingle(const Config& config, State& state, vector<double> & Alpha, DoubleVec4d& X, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& LogLik, DoubleVec3d& SumExpTheta, const IntVec4d& Count, const IntVec3d& SumCount, DoubleVec1d&  L)
 {
   static DoubleVec1d NewTheta(config.numRegion, 0.0);
   static DoubleVec1d NewExpTheta(config.numRegion, 0.0);
@@ -2433,10 +2425,10 @@ static void update_XSingle(const Config& config, vector<double> & Alpha, DoubleV
 	        }
 
 	        double A = exp(LogLikRatio); // acceptance prob
-	        XATTEMPT +=1;
+	        state.x.attempt +=1;
 
           if (distr(eng) < A) { // accept move
-            XACCEPT += 1;
+            state.x.accept += 1;
             X[r][k][l][j] = NewX;
             for (int s = r; s < config.numRegion; s++) {
               Theta[s][k][l][j] = NewTheta[s];
@@ -2453,7 +2445,7 @@ static void update_XSingle(const Config& config, vector<double> & Alpha, DoubleV
 }
 
 // update each Y individually (better acceptance rate/ larger proposal variance,// but more likelihood evaluations!)
-static void update_YSingle(const Config& config, vector<double> & Delta, DoubleVec2d& Y, DoubleVec2d& Psi, DoubleVec2d& ExpPsi, DoubleVec1d& SumExpPsi, vector<int> & Region, vector<int> & Species, DoubleVec1d& M)
+static void update_YSingle(const Config& config, State& state, vector<double> & Delta, DoubleVec2d& Y, DoubleVec2d& Psi, DoubleVec2d& ExpPsi, DoubleVec1d& SumExpPsi, vector<int> & Region, vector<int> & Species, DoubleVec1d& M)
 {
   // These do not need initialization as are initialized inline
   static DoubleVec1d NewPsi(config.numRegion, 0.0);
@@ -2489,10 +2481,10 @@ static void update_YSingle(const Config& config, vector<double> & Delta, DoubleV
 
       double A = exp(LogLikRatio); // acceptance prob
       
-      YATTEMPT +=1;
+      state.y.attempt += 1;
       
       if(distr(eng)<A ){ //accept move 
-	YACCEPT +=1;
+	state.y.accept += 1;
 	Y[r][k] = NewY;
         for (int s = r; s < config.numRegion; s++) {
           Psi[s][k] = NewPsi[s];
@@ -2505,39 +2497,39 @@ static void update_YSingle(const Config& config, vector<double> & Delta, DoubleV
 }
 
 
-static void DoAllUpdates(const Config& config, DoubleVec4d& X, double & Beta,  vector<double> & Gamma, vector<double> & Alpha, DoubleVec2d& Mu, DoubleVec3d& Nu, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& LogLik, DoubleVec3d& SumExpTheta, IntVec4d& Count, IntVec3d& SumCount, DoubleVec1d& L, vector<vector<vector<int> > > & Genotype, vector<int> & Region, vector<int> & Species, vector<vector<double> > & Pi, vector<double> & Xcoord, vector<double> & Ycoord, DoubleVec2d& Y, double & Eta, vector<double> & Delta, DoubleVec1d& Lambda, DoubleVec2d& Psi, DoubleVec2d& ExpPsi, DoubleVec1d& SumExpPsi, DoubleVec1d& M, vector<double> & BoundaryX, vector<double> & BoundaryY, const Mapgrid& mymapgrid )
+static void DoAllUpdates(const Config& config, State& state, DoubleVec4d& X, double & Beta,  vector<double> & Gamma, vector<double> & Alpha, DoubleVec2d& Mu, DoubleVec3d& Nu, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& LogLik, DoubleVec3d& SumExpTheta, IntVec4d& Count, IntVec3d& SumCount, DoubleVec1d& L, vector<vector<vector<int> > > & Genotype, vector<int> & Region, vector<int> & Species, vector<vector<double> > & Pi, vector<double> & Xcoord, vector<double> & Ycoord, DoubleVec2d& Y, double & Eta, vector<double> & Delta, DoubleVec1d& Lambda, DoubleVec2d& Psi, DoubleVec2d& ExpPsi, DoubleVec1d& SumExpPsi, DoubleVec1d& M, vector<double> & BoundaryX, vector<double> & BoundaryY, const Mapgrid& mymapgrid )
 {
   if (config.updateBeta)
     update_Beta(config,Beta,Mu);
   if (config.updateX) {
     if (config.updateJoint)
-      update_XJoint(config,Alpha,X,Mu,Nu,Theta,ExpTheta,LogLik,SumExpTheta,Count,SumCount,L);
+      update_XJoint(config,state,Alpha,X,Mu,Nu,Theta,ExpTheta,LogLik,SumExpTheta,Count,SumCount,L);
     else
-      update_XSingle(config,Alpha,X,Theta,ExpTheta,LogLik,SumExpTheta,Count,SumCount,L);
+      update_XSingle(config,state,Alpha,X,Theta,ExpTheta,LogLik,SumExpTheta,Count,SumCount,L);
   }
   if (config.updateAlpha)
-    update_Alpha(config,Alpha,X,Mu,Nu,Theta,ExpTheta,LogLik,SumExpTheta,Count,SumCount,L,Xcoord,Ycoord);
+    update_Alpha(config,state,Alpha,X,Mu,Nu,Theta,ExpTheta,LogLik,SumExpTheta,Count,SumCount,L,Xcoord,Ycoord);
 
   if (config.updateMu)
-    update_Mu(config,Mu,Beta,Theta,ExpTheta,LogLik,SumExpTheta,Count,SumCount);
+    update_Mu(config,state,Mu,Beta,Theta,ExpTheta,LogLik,SumExpTheta,Count,SumCount);
 
   if (config.updateNu) {
-    update_Nu(config,Nu,Gamma,Theta,ExpTheta,LogLik,SumExpTheta,Count,SumCount);
+    update_Nu(config,state,Nu,Gamma,Theta,ExpTheta,LogLik,SumExpTheta,Count,SumCount);
     for (int k = 0; k < config.numSpecies; k++)
       update_Beta(config,Gamma[k],Nu[k]);
   }
 
   if (config.locate)
-    update_Location(config,Alpha,X,Mu,Nu,Theta,ExpTheta,SumExpTheta,LogLik,L,Count,SumCount,Xcoord,Ycoord,Species,Genotype,Region,BoundaryX, BoundaryY, mymapgrid);
+    update_Location(config,state,Alpha,X,Mu,Nu,Theta,ExpTheta,SumExpTheta,LogLik,L,Count,SumCount,Xcoord,Ycoord,Species,Genotype,Region,BoundaryX, BoundaryY, mymapgrid);
 
   if (config.numSpecies > 1) {
     update_Species(config, Species, Pi, Region, Genotype, ExpTheta, SumExpTheta);
     count_up_alleles(config,Count,Region,Species,Genotype);
     calc_SumCount(config, Count, SumCount);
-    update_Lambda(config, Lambda, Eta, Psi, ExpPsi, SumExpPsi, Region, Species);
+    update_Lambda(config, state, Lambda, Eta, Psi, ExpPsi, SumExpPsi, Region, Species);
     update_Eta(config,Eta,Lambda);
-    update_YSingle(config,Delta,Y,Psi,ExpPsi,SumExpPsi,Region,Species,M);
-    update_Delta(config,Delta,Y,Lambda,Psi,ExpPsi,SumExpPsi,Species,Region,M,Xcoord,Ycoord);
+    update_YSingle(config,state,Delta,Y,Psi,ExpPsi,SumExpPsi,Region,Species,M);
+    update_Delta(config,state,Delta,Y,Lambda,Psi,ExpPsi,SumExpPsi,Species,Region,M,Xcoord,Ycoord);
     compute_Pi(config, Pi, ExpPsi, SumExpPsi);
 
     // This one is probably needed -- not checking at this time
@@ -3242,15 +3234,17 @@ int main ( int argc, char** argv)
   int printdot = max(config.numBurn * config.screenProgressInterval,1.0);
   int printincr = printdot;
 
+  State state;
+
   if (!config.locateWholeRegion) {
     // cerr << "Performing Global Burn-in iterations" << endl;
     cout << "Performing Global Burn-in iterations" << flush;
     for (int iter = 0; iter < config.numBurn; iter++) {
       for (int nthin = 0; nthin < config.numThin; nthin++) {
-        DoAllUpdates(config,X,Beta,Gamma,Alpha,Mu,Nu,Theta,ExpTheta,LogLik,SumExpTheta,Count,SumCount,L,Genotype,Region,Species,Pi,Xcoord,Ycoord,Y,Eta, Delta,Lambda,  Psi,ExpPsi, SumExpPsi, M, BoundaryX, BoundaryY, mymapgrid);
+        DoAllUpdates(config,state,X,Beta,Gamma,Alpha,Mu,Nu,Theta,ExpTheta,LogLik,SumExpTheta,Count,SumCount,L,Genotype,Region,Species,Pi,Xcoord,Ycoord,Y,Eta, Delta,Lambda,  Psi,ExpPsi, SumExpPsi, M, BoundaryX, BoundaryY, mymapgrid);
       }
 
-      OutputAcceptRates(config, acceptFile);
+      OutputAcceptRates(config, state, acceptFile);
 
       // testing says that a call to calc_LogLik is not needed here
       // as DoAllUpdates adequately updates it
@@ -3287,18 +3281,18 @@ int main ( int argc, char** argv)
   totaliter = 0;
 	
   if(config.locate){
-    for(SAMPLETOLOCATE = config.firstSampleToLocate; SAMPLETOLOCATE <= config.lastSampleToLocate; SAMPLETOLOCATE++){
+    for(state.sampleToLocate = config.firstSampleToLocate; state.sampleToLocate <= config.lastSampleToLocate; state.sampleToLocate++){
       
       std::string LOCATEFILE(config.outputDir);
 	  LOCATEFILE.append("/");
-      LOCATEFILE.append( Id[SAMPLETOLOCATE] );
-      LOCACCEPT = 0;
-      LOCATTEMPT = 0;
+      LOCATEFILE.append( Id[state.sampleToLocate] );
+      state.loc.accept = 0;
+      state.loc.attempt = 0;
 
       ofstream locatefile (LOCATEFILE.c_str());
       
-      // cerr << "Individual:" << (SAMPLETOLOCATE+1) << endl;      
-      string outname = Id[SAMPLETOLOCATE];
+      // cerr << "Individual:" << (sampleToLocate+1) << endl;      
+      string outname = Id[state.sampleToLocate];
       if (outname.length() > config.maxOutCharsInName) {
         int diff = outname.length() - config.maxOutCharsInName;
         outname.erase(config.maxOutCharsInName,diff);
@@ -3307,18 +3301,18 @@ int main ( int argc, char** argv)
       cout << "Individual: " << outname << flush;
 
       // reset theta, counts, etc, ignoring individual ind
-      TRUEREGION = Region[SAMPLETOLOCATE];
-      Region[SAMPLETOLOCATE] = config.numRegion - 1;
+      state.trueRegion = Region[state.sampleToLocate];
+      Region[state.sampleToLocate] = config.numRegion - 1;
       if (config.locateWholeRegion) { // locate all the inds from that region
         for (int i = 0; i < config.numInd; i++) {
-          if (Region[i] == TRUEREGION)
+          if (Region[i] == state.trueRegion)
             Region[i] = config.numRegion - 1;
         }
       }
       
       //cout << "Initialising XY position... ";
       //cerr << "Initialising XY position... ";
-      InitialiseXY(config,BoundaryX,BoundaryY,Xcoord,Ycoord,mymapgrid);
+      InitialiseXY(config,state,BoundaryX,BoundaryY,Xcoord,Ycoord,mymapgrid);
       //cerr << "Done" << endl;
 
       calc_L(config,L,Alpha,Xcoord,Ycoord);
@@ -3326,7 +3320,7 @@ int main ( int argc, char** argv)
 		
       if (config.removeRegion) { // remove all individuals from the true region
 	     for(int i = 0; i < config.numInd; i++){
-	        if(Region[i] == TRUEREGION)
+	        if(Region[i] == state.trueRegion)
 	            SubtractFromCount(config, i, Count, SumCount, Region, Species, Genotype);    
 	     }
       }
@@ -3361,7 +3355,7 @@ int main ( int argc, char** argv)
           printdot += printincr;
         }
         for (int nthin = 0; nthin < config.numThin; nthin++) {
-          DoAllUpdates(config,X,Beta,Gamma,Alpha,Mu,Nu,Theta,ExpTheta,LogLik,SumExpTheta,Count,SumCount,L,Genotype,Region,Species,Pi,Xcoord,Ycoord,Y,Eta, Delta,Lambda,  Psi,ExpPsi, SumExpPsi, M, BoundaryX, BoundaryY, mymapgrid);
+          DoAllUpdates(config,state,X,Beta,Gamma,Alpha,Mu,Nu,Theta,ExpTheta,LogLik,SumExpTheta,Count,SumCount,L,Genotype,Region,Species,Pi,Xcoord,Ycoord,Y,Eta, Delta,Lambda,  Psi,ExpPsi, SumExpPsi, M, BoundaryX, BoundaryY, mymapgrid);
         }
         // this should not be needed due to call in update_Locations
         // calc_LogLik(LogLik,Theta,SumExpTheta,Count,SumCount);
@@ -3384,7 +3378,7 @@ int main ( int argc, char** argv)
           printdot += printincr;
         }
         for (int nthin = 0; nthin < config.numThin; nthin++) {
-          DoAllUpdates(config,X,Beta,Gamma,Alpha,Mu,Nu,Theta,ExpTheta,LogLik,SumExpTheta,Count,SumCount,L,Genotype,Region,Species,Pi,Xcoord,Ycoord,Y,Eta, Delta,Lambda,  Psi,ExpPsi, SumExpPsi, M, BoundaryX, BoundaryY, mymapgrid);
+          DoAllUpdates(config,state,X,Beta,Gamma,Alpha,Mu,Nu,Theta,ExpTheta,LogLik,SumExpTheta,Count,SumCount,L,Genotype,Region,Species,Pi,Xcoord,Ycoord,Y,Eta, Delta,Lambda,  Psi,ExpPsi, SumExpPsi, M, BoundaryX, BoundaryY, mymapgrid);
         }
         // This should not be needed due to call in update_Locations
         // calc_LogLik(LogLik,Theta,SumExpTheta,Count,SumCount);
@@ -3394,27 +3388,29 @@ int main ( int argc, char** argv)
 	OutputLatLongs(locatefile,Xcoord[config.numRegion-1],Ycoord[config.numRegion-1],sumloglik);
 
 	UpdateMeans(config, ExpTheta, X, Pi, SumExpTheta, MeanFreq, MeanX, MeanX2, MeanPi, MeanCov, MeanFittedCov, MeanCor, MeanFittedCor, Alpha, Xcoord, Ycoord,Theta,Mu,Nu);	
-	UpdateLocusMeanProb(config, SAMPLETOLOCATE, ExpTheta, SumExpTheta, LocusMeanProb, Genotype);
+	UpdateLocusMeanProb(config, state.sampleToLocate, ExpTheta, SumExpTheta, LocusMeanProb, Genotype);
 	
 	totaliter++;
       }
       cout << "." << endl;
       
-      locatefile << "Acceptance rate: " << LOCACCEPT*1.0/LOCATTEMPT  << endl;
+      locatefile << "Acceptance rate: ";
+      outputAcceptanceRate(state.loc, locatefile);
+      locatefile << std::endl;
 
       locatefile.close();
       
       if (config.removeRegion) { // add back all individuals from the true region
         for (int i = 0; i < config.numInd; i++) {
-          if(Region[i] == TRUEREGION)
+          if(Region[i] == state.trueRegion)
 	    AddToCount(config, i, Count, SumCount, Region, Species, Genotype);
         }
       }
-      Region[SAMPLETOLOCATE] = TRUEREGION; // reset to original region
+      Region[state.sampleToLocate] = state.trueRegion; // reset to original region
       if (config.locateWholeRegion) {
         for (int i = 0; i < config.numInd; i++) {
           if (Region[i] == config.numRegion - 1)
-            Region[i] = TRUEREGION;
+            Region[i] = state.trueRegion;
         }
       }
       // cerr << endl;
@@ -3480,8 +3476,8 @@ int main ( int argc, char** argv)
 
   } else { // if not cross-validating
 
-    XACCEPT = 0;
-    XATTEMPT = 0;
+    state.x.accept = 0;
+    state.x.attempt = 0;
     // cerr << "Performing Main Iterations " << endl;
     cout << "Performing Main Iterations" << flush;
     printdot = max(config.numIter * config.screenProgressInterval,1.0);
@@ -3489,7 +3485,7 @@ int main ( int argc, char** argv)
 
     for (int iter = 0; iter < config.numIter; iter++) {
       for (int nthin = 0; nthin < config.numThin; nthin++) {
-        DoAllUpdates(config,X,Beta,Gamma,Alpha,Mu,Nu,Theta,ExpTheta,LogLik,SumExpTheta,Count,SumCount,L,Genotype,Region,Species,Pi,Xcoord,Ycoord,Y,Eta, Delta,Lambda,  Psi,ExpPsi, SumExpPsi, M, BoundaryX, BoundaryY, mymapgrid);
+        DoAllUpdates(config,state,X,Beta,Gamma,Alpha,Mu,Nu,Theta,ExpTheta,LogLik,SumExpTheta,Count,SumCount,L,Genotype,Region,Species,Pi,Xcoord,Ycoord,Y,Eta, Delta,Lambda,  Psi,ExpPsi, SumExpPsi, M, BoundaryX, BoundaryY, mymapgrid);
       }
 
       // Test if this one is needed  -- not tested as not in execution path for test data
