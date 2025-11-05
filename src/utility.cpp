@@ -1,25 +1,21 @@
-#include "utility.hpp"
-
-#include <numeric>
-#include <cstdlib>
 #include <cmath>
 #include <random>
 
-// SCAT version 2.2.0
+#include "utility.hpp"
 
-using namespace std;
+// SCAT version 2.2.0
 
 std::mt19937 eng;
 std::uniform_real_distribution<> distr(0.0, 1.0);
 
 // generate a random integer according to a user-defined density
-int rint2 ( const vector<double> & prob, double psum )
+int rint2 ( const std::vector<double> & prob, double psum )
 {
     double csum = prob[0];
     double u = distr(eng);
     
     if(psum == 0.0){ // return a uniform random number if all zeros
-      return (int) floor(prob.size() * u);
+      return (int) std::floor(prob.size() * u);
     }
     else
       {
@@ -30,7 +26,7 @@ int rint2 ( const vector<double> & prob, double psum )
             csum += prob[i+1];
 	  }
 	} else {
-	  vector<double> cumprob ( prob.size(), 0.0 );
+	  std::vector<double> cumprob ( prob.size(), 0.0 );
 	  // Calculate cdf
 	  std::partial_sum ( prob.begin(), prob.end(), cumprob.begin());
 	  u *= cumprob[prob.size()-1];
@@ -46,7 +42,7 @@ int rint2 ( const vector<double> & prob, double psum )
 //
 // Random permutation of 0 to n-1, in perm
 //
-void rperm(vector<int> & perm,int n)
+void rperm(std::vector<int> & perm,int n)
 {
   int i,s,temp,t;
   for(i=0;i<n;i++)
@@ -54,7 +50,7 @@ void rperm(vector<int> & perm,int n)
   for(i=0;i<n;i++)
     {
       t=n-i-1; // t runs from n-1 down to 0
-      s=(int) floor((t+1)*distr(eng)); // s unif on 0 to t
+      s=(int) std::floor((t+1)*distr(eng)); // s unif on 0 to t
       temp=perm[s]; // swap s and t
       perm[s]=perm[t];
       perm[t]=temp;
@@ -65,7 +61,7 @@ void rperm(vector<int> & perm,int n)
 double dnorm(double x)
 {
   double PI = 3.141592;
-  return (1.0/sqrt(2*PI)) * exp(-0.5*x*x);
+  return (1.0/std::sqrt(2*PI)) * std::exp(-0.5*x*x);
 }
 //
 // normal random generator
@@ -83,7 +79,7 @@ double rnorm(double mu,double sigma)
 	z=0.25*x*x;
 	if(z<(1-u)) goto loopend;
 	if(z>(0.259/u+0.35)) goto loopstart;
-	if(z>(-log(u))) goto loopstart;
+	if(z>(-std::log(u))) goto loopstart;
 	loopend:
 	return mu+sigma*x;
 }
@@ -103,12 +99,12 @@ double rgamma(double n,double lambda)
 		one: 
 		p=b*distr(eng);
 		if(p>1) goto two;
-		x=exp(log(p)/n);
-		if(x>-log(distr(eng))) goto one;
+		x=std::exp(std::log(p)/n);
+		if(x>-std::log(distr(eng))) goto one;
 		goto three;
 		two: 
-		x=-log((b-p)/n);
-		if (((n-1)*log(x))<log(distr(eng))) goto one;
+		x=-std::log((b-p)/n);
+		if (((n-1)*std::log(x))<std::log(distr(eng))) goto one;
 		three:;	
 	}
 	else if(n==1.0)
@@ -148,7 +144,7 @@ double rgamma(double n,double lambda)
 			c2=aa*(n-1/(6*n));
 			c3=2*aa;
 			c4=c3+2;
-			if(n>2.5) c5=1/sqrt(n);
+			if(n>2.5) c5=1/std::sqrt(n);
 		}
 		four:
 		u1=distr(eng);
@@ -159,7 +155,7 @@ double rgamma(double n,double lambda)
 		five:
 		double w=c2*u2/u1;
 		if(c3*u1+w+1.0/w < c4) goto six;
-		if(c3*log(u1)-log(w)+w >=1) goto four;
+		if(c3*std::log(u1)-std::log(w)+w >=1) goto four;
 		six:
 		x=c1*w;		
 		nprev=n;
@@ -191,7 +187,7 @@ void rdirichlet(const double * a, const int k, double * b)
 // dirichlet random generator
 // set b to be ~Dirichlet(a)
 //
-void rdirichlet(const vector<double> & a, const int k, vector<double> & b)
+void rdirichlet(const std::vector<double> & a, const int k, std::vector<double> & b)
 {
   int i;
 	double sum=0.0;

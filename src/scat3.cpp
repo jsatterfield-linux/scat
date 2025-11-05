@@ -3,27 +3,20 @@
 
 // SCAT version 3.0.3
 
-#include "scat3.hpp"
-#include "utility.hpp"
+#include <algorithm>
 #include <array>
-#include <string>
-#include <iostream>
-#include <fstream>
-#include <vector>
 #include <cassert>
 #include <cmath>
-#include <algorithm>
-#include <iomanip>
-#include <numeric>
-#include <cmath>
-#include "string.h"
-#include "readboundary.hpp"
-#include <random>
-#include <sstream>  // for ToString(foo) functions
-#include <limits>   // for ToString(foo) functions
 #include <deque>
+#include <iomanip>
+#include <iostream>
+#include <limits>   // for ToString(foo) functions
+#include <sstream>  // for ToString(foo) functions
+#include <string>
 
-using namespace std; 
+#include "readboundary.hpp"
+#include "scat3.hpp"
+#include "utility.hpp"
 
 // Declarations moved here from scat3.hpp by Mary 5/10/22
 
@@ -59,7 +52,7 @@ struct Config {
   // number of regions read from regionsFile
   int numRegion;
   // number of alleles
-  std::vector<int> numAllele;
+  IntVec1d numAllele;
 
   // '-S' (default false); whether the seed is set
   bool seedSet = false;
@@ -227,10 +220,9 @@ struct State {
 
 // end of moved declarations
 
-string tracefilename("tracefile.txt");
-ofstream TRACEFILE(tracefilename.c_str());
+std::ofstream TRACEFILE("tracefile.txt");
 
-static void error_and_exit(const string& msg) {
+static void error_and_exit(const std::string& msg) {
   std::cerr << msg << std::endl;
   exit(-1);
 }
@@ -246,10 +238,10 @@ static bool CheckThetaValues(const Config& config, const DoubleVec4d& Theta, con
         double sumExpTheta = 0.0;
         for (int j = 0; j < config.numAllele[l]; j++) {
           // check expTheta
-          double expTheta = exp(Theta[r][k][l][j]);
+          double expTheta = std::exp(Theta[r][k][l][j]);
           if(ExpTheta[r][k][l][j] != expTheta) {
-            cerr << "ExpTheta incorrect for " << r << " ";
-            cerr << k << " " << l << " " << j << endl;
+            std::cerr << "ExpTheta incorrect for " << r << " ";
+            std::cerr << k << " " << l << " " << j << std::endl;
             correct = false;
           }
           sumExpTheta += expTheta;
@@ -259,9 +251,9 @@ static bool CheckThetaValues(const Config& config, const DoubleVec4d& Theta, con
         // accumulates a small rounding error, as reflected in original author's
         // CheckSumExpTheta function.
         if(fabs(sumExpTheta - SumExpTheta[r][k][l]) > epsilon) {
-          cerr << "SumExpTheta incorrect for " << r << " ";
-          cerr << k << " " << l << endl;
-          cerr << "Expected " << SumExpTheta[r][k][l] << " calculated " << sumExpTheta << endl;
+          std::cerr << "SumExpTheta incorrect for " << r << " ";
+          std::cerr << k << " " << l << std::endl;
+          std::cerr << "Expected " << SumExpTheta[r][k][l] << " calculated " << sumExpTheta << std::endl;
           correct = false;
         }
       }
@@ -276,17 +268,17 @@ static bool CheckPsiValues(const Config& config, const DoubleVec2d& Psi, const D
     double sumExpPsi = 0.0;
     for (int k = 0; k < config.numSpecies; k++) {
       // check expPsi
-      double expPsi = exp(Psi[r][k]);
+      double expPsi = std::exp(Psi[r][k]);
       if(ExpPsi[r][k] != expPsi) {
-        cerr << "ExpPsi incorrect for " << r << " " << k << endl;
-        cerr << "Expected " << ExpPsi[r][k] << " " << " calculated " << expPsi << endl;
+        std::cerr << "ExpPsi incorrect for " << r << " " << k << std::endl;
+        std::cerr << "Expected " << ExpPsi[r][k] << " " << " calculated " << expPsi << std::endl;
         correct = false;
       }
       sumExpPsi += expPsi;
     }
     if(SumExpPsi[r] != sumExpPsi) {
-      cerr << "SumExpPsi incorrect for " << r << endl;
-      cerr << "Expected " << SumExpPsi[r] << " calculated " << sumExpPsi << endl;
+      std::cerr << "SumExpPsi incorrect for " << r << std::endl;
+      std::cerr << "Expected " << SumExpPsi[r] << " calculated " << sumExpPsi << std::endl;
       correct = false;
     }
   }
@@ -305,8 +297,8 @@ static bool CheckCountValues(const Config& config, const IntVec4d& Count, const 
         }
         // Check SumCount
         if(sumCount != SumCount[r][k][l]) {
-          cerr << "SumCount incorrect for " << r << " " << k << " " << l << endl;
-          cerr << "Expected " << SumCount[r][k][l] << " calculated " << sumCount << endl;
+          std::cerr << "SumCount incorrect for " << r << " " << k << " " << l << std::endl;
+          std::cerr << "Expected " << SumCount[r][k][l] << " calculated " << sumCount << std::endl;
           correct = false;
         }
       }
@@ -338,7 +330,7 @@ static bool CompareLogLiks(const Config& config, const DoubleVec3d& newLL, const
     }
   }
   if (discrepancy > epsilon) {
-    cerr << "Likelihood has changed:  difference between old and new " << discrepancy << endl;
+    std::cerr << "Likelihood has changed:  difference between old and new " << discrepancy << std::endl;
     return false;
   }
   return true;
@@ -370,7 +362,7 @@ static bool InRange(const Config& config, double x, double y, const DoubleVec1d&
 }
 
   
-static double isLeft(double x0, double y0, double x1, double y1,  double x2, double y2){
+static double isLeft(double x0, double y0, double x1, double y1, double x2, double y2) {
   return( (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0) );
 }
 
@@ -403,7 +395,7 @@ static int IsInsideBoundary( double x, double y, const DoubleVec1d& BoundaryX, c
 }
 //===================================================================
 
-static void InitialiseXY(const Config& config, const State& state, vector<double> & BoundaryX, vector<double> & BoundaryY, vector<double> & Xcoord, vector<double> & Ycoord, const Mapgrid& mymapgrid)
+static void InitialiseXY(const Config& config, const State& state, const DoubleVec1d& BoundaryX, const DoubleVec1d& BoundaryY, DoubleVec1d& Xcoord, DoubleVec1d& Ycoord, const Mapgrid& mymapgrid)
 {
   if (config.forestOnly) {
     Xcoord[config.numRegion - 1] = 0.2;
@@ -431,13 +423,13 @@ static void InitialiseXY(const Config& config, const State& state, vector<double
     int ntries = 0;
     do{
       if (ntries == 100) {
-        cerr << "SCAT InitialiseXY(), tried 100 times and fails" << endl;
+        std::cerr << "SCAT InitialiseXY(), tried 100 times and fails" << std::endl;
         exit(-1);
       }
       double lambda = distr(eng);
       double randpick = distr(eng);
       if (randpick == 1.0) {
-        cerr << "distr(eng) returned 1.0; need to guard against this" << endl;
+        std::cerr << "distr(eng) returned 1.0; need to guard against this" << std::endl;
         exit(-1);
       }
       int r = (int) (distr(eng) * (config.numRegion - 1));
@@ -449,16 +441,16 @@ static void InitialiseXY(const Config& config, const State& state, vector<double
 #if 0
     float randpick = distr(eng);
     if (randpick == 1.0) {
-      cerr << "distr(eng) returned 1.0; need to guard against this" << endl;
+      std::cerr << "distr(eng) returned 1.0; need to guard against this" << std::endl;
       exit(-1);
     }
     int randomreg = (int) (randpick * (config.numRegion - 1));
     Xcoord[config.numRegion - 1] = Xcoord[randomreg];
     Ycoord[config.numRegion - 1] = Ycoord[randomreg];
     if(!InRange(Xcoord[config.numRegion - 1],Ycoord[config.numRegion - 1],BoundaryX,BoundaryY,mymapgrid)) {
-      cerr << "\nReference population " << randomreg << " at " << Xcoord[config.numRegion - 1] << " " << Ycoord[config.numRegion-1] << " appears to be outside the map:  terminating" << endl;
+      std::cerr << "\nReference population " << randomreg << " at " << Xcoord[config.numRegion - 1] << " " << Ycoord[config.numRegion-1] << " appears to be outside the map:  terminating" << std::endl;
       for (int reg = 0; reg < config.numRegion; reg++) {
-        cout << reg << " " << Xcoord[reg] << " " << Ycoord[reg] << endl;
+        std::cout << reg << " " << Xcoord[reg] << " " << Ycoord[reg] << std::endl;
       }
       exit(-1);
     }
@@ -467,14 +459,14 @@ static void InitialiseXY(const Config& config, const State& state, vector<double
 }
 
 
-static void ReadInBoundary(const Config& config, ifstream & bfile, vector<double> & BoundaryX, vector<double> & BoundaryY)
+static void ReadInBoundary(const Config& config, std::ifstream& bfile, DoubleVec1d& BoundaryX, DoubleVec1d& BoundaryY)
 {
    double x,y;
    do{
       bfile >> y;
       bfile >> x;
       if (config.echoInputs)
-        cout << to_degrees(y) << "," << to_degrees(x) << endl;
+        std::cout << to_degrees(y) << "," << to_degrees(x) << std::endl;
       x = PI*x/180;
       y = PI*y/180;
       BoundaryX.push_back(x);
@@ -483,7 +475,7 @@ static void ReadInBoundary(const Config& config, ifstream & bfile, vector<double
 
 }
 	
-static int GetLocationNumber(vector<int> & RegionsPresent, int r)
+static int GetLocationNumber(const IntVec1d& RegionsPresent, int r)
 {
   if(r <0)
     return r;
@@ -496,7 +488,7 @@ static int GetLocationNumber(vector<int> & RegionsPresent, int r)
   return s;
 }
 
-static int GetLocationNumberAdd(vector<int> & RegionsPresent, int r)
+static int GetLocationNumberAdd(IntVec1d& RegionsPresent, int r)
 {
 	  if(r <0)
 		      return r;
@@ -514,7 +506,7 @@ static int GetLocationNumberAdd(vector<int> & RegionsPresent, int r)
 
 
 
-static void permute_regions (vector<int> & Region, vector<int> & Perm){
+static void permute_regions(IntVec1d& Region, const IntVec1d& Perm){
 	for(unsigned long r = 0; r< Region.size(); r++){
 		if(Region[r]>=0){
 			Region[r] = Perm[Region[r]];
@@ -523,10 +515,10 @@ static void permute_regions (vector<int> & Region, vector<int> & Perm){
 }
 
 
-static string getline(streambuf * pbuf)
+static std::string getline(std::streambuf * pbuf)
 {
     char ch;
-    string str;
+    std::string str;
     size_t pos;
     while((ch = pbuf->sgetc()) != EOF)
     {
@@ -538,7 +530,7 @@ static string getline(streambuf * pbuf)
         else {
             pbuf->sbumpc();  //chomp;
             pos = str.find_first_not_of(";, \t", 0);
-            if(str.empty() || pos  == string::npos || str.at(pos) == '#')
+            if(str.empty() || pos  == std::string::npos || str.at(pos) == '#')
             {
                 str.clear();
                 continue;
@@ -551,16 +543,16 @@ static string getline(streambuf * pbuf)
 }   //this getline use ;, \t as delimit, and ignore the lines either full of delimit or starting with #. 
 
 
-static void input_genotype_data(const Config& config, ifstream & input, vector<int>  & Region,
-  vector<int> & Species, vector<vector<vector<int> > > & Genotype, vector<int> & NMissing, vector<string> & Id, vector<int> & RegionsPresent,bool useregion)
+static void input_genotype_data(const Config& config, std::ifstream& input, IntVec1d& Region,
+  IntVec1d& Species, IntVec3d& Genotype, IntVec1d& NMissing, StringVec1d& Id, IntVec1d& RegionsPresent, bool useregion)
 {
-  string delimit(" \t");
-  streambuf * pbuf = input.rdbuf();
+  std::string delimit(" \t");
+  std::streambuf * pbuf = input.rdbuf();
   int badallele = -1000;
   
-  string line;
+  std::string line;
   line.assign(getline(pbuf));
-  cout << "Reading Genotype Data" << endl;
+  std::cout << "Reading Genotype Data" << std::endl;
   // the following loop processes the two lines of one sample
   while(line.size()>0){
     for(int chrom = 0; chrom<2; chrom++){
@@ -569,15 +561,15 @@ static void input_genotype_data(const Config& config, ifstream & input, vector<i
       if(end == beg) break;
 
       // process sample ID 
-      string sv(line, beg, end-beg);
+      std::string sv(line, beg, end-beg);
       if(chrom==0){
         Id.push_back(sv);
-	NMissing.push_back(0);
-	vector<vector<int> > blank(2,vector<int>(config.numLoci,badallele));
-	Genotype.push_back(blank);
+        NMissing.push_back(0);
+        IntVec2d blank(2, IntVec1d(config.numLoci, badallele));
+        Genotype.push_back(blank);
       } else {
         if (sv != Id.back()) {
-          string msg = "Second entry for " + Id.back() + "not found";
+          std::string msg = "Second entry for " + Id.back() + "not found";
           error_and_exit(msg);
         }
       }
@@ -586,28 +578,28 @@ static void input_genotype_data(const Config& config, ifstream & input, vector<i
       beg = line.find_first_not_of(delimit, end);
       end = line.find_first_of(delimit, beg);
       sv = line.substr(beg, end-beg);
-      int r = atoi(sv.data());	
+      int r = std::stoi(sv.data());	
       if(!useregion) {
         r= -1;
       } else { 
         r = GetLocationNumberAdd(RegionsPresent, r);
         if(r <(-1)) { 
-          cerr << "Error in numbering of locations in genotype file" << endl;
-          cerr << "Individal ID = " << Id[Id.size()-1] << endl;
+          std::cerr << "Error in numbering of locations in genotype file" << std::endl;
+          std::cerr << "Individal ID = " << Id[Id.size()-1] << std::endl;
           exit(1);
         }
       }
       if(chrom==1) {
         if(r>=0) {
           if(r != Region.back()) {
-            string msg = "Two haplotypes of the same individual in different regions";
+            std::string msg = "Two haplotypes of the same individual in different regions";
             error_and_exit(msg);
           }
         }
       }
       if(chrom==0){
         if(r<0 && config.numSpecies > 1) {
-          cerr << "Error: mustn't have individuals of unknown location with more than 1 species" << endl;
+          std::cerr << "Error: mustn't have individuals of unknown location with more than 1 species" << std::endl;
 	  exit(1);
         }
         Region.push_back(r);
@@ -616,22 +608,22 @@ static void input_genotype_data(const Config& config, ifstream & input, vector<i
 		
       // skip unwanted columns
       for(int skip = 0; skip<config.skipCol; skip++){
-	beg = line.find_first_not_of(delimit, end);
-	end = line.find_first_of(delimit, beg);
+        beg = line.find_first_not_of(delimit, end);
+        end = line.find_first_of(delimit, beg);
       }
 
       // read genotype data
       int individual = Genotype.size()-1;
       for(int j=0; j<config.numLoci; j++){
         int allele;
-	beg = line.find_first_not_of(delimit, end);
-  	end = line.find_first_of(delimit, beg);
-  	string sv(line, beg, end-beg);
+        beg = line.find_first_not_of(delimit, end);
+        end = line.find_first_of(delimit, beg);
+        std::string sv(line, beg, end - beg);
         if(sv == "") {
-          string msg = "Too few markers found for individual " + to_string(individual);
+          std::string msg = "Too few markers found for individual " + std::to_string(individual);
           error_and_exit(msg);
         }
-  	allele = atoi(sv.data());  			  
+  	allele = std::stoi(sv.data());  			  
 	 
   	Genotype[individual][chrom][j] = allele;
   	if((allele<0) && (chrom ==0))
@@ -643,17 +635,17 @@ static void input_genotype_data(const Config& config, ifstream & input, vector<i
   }
 }
 
-static void OutputLatLongs(ostream & locatefile, double x, double y, double loglik){
+static void OutputLatLongs(std::ostream& locatefile, double x, double y, double loglik){
   // convert x and y into lat and long
-  locatefile << 180 * y/PI << " " << 180 * x/PI <<  " " << loglik << endl; 
+  locatefile << 180 * y/PI << " " << 180 * x/PI <<  " " << loglik << std::endl; 
 }
 
-static void OutputRegionNames(const Config& config, ostream & freqFile, const vector<string> & RegionName, const vector<int> & Perm)
+static void OutputRegionNames(const Config& config, std::ostream& freqFile, const StringVec1d& RegionName, const IntVec1d& Perm)
 {
   for (int r = 0; r < config.numRegion; r++) {
-    freqFile << std::fixed << setw(9-RegionName[Perm[r]].size()) << RegionName[Perm[r]] << " ";
+    freqFile << std::fixed << std::setw(9-RegionName[Perm[r]].size()) << RegionName[Perm[r]] << " ";
   }
-  freqFile << endl;
+  freqFile << std::endl;
 }
 
 static void outputAcceptanceRate(const AcceptanceStat& stat, std::ostream& ostr, bool leadingSpace = true) {
@@ -679,20 +671,20 @@ static void OutputAcceptRates(const Config& config, const State& state, std::ost
   ostr << std::endl;
 }    
 
-static void output_positions_data(const vector<string> & RegionName, const vector<int> & Region, const vector<double> & x, const vector<double> & y, const vector<string> & Id){
+static void output_positions_data(const StringVec1d& RegionName, const IntVec1d& Region, const DoubleVec1d& x, const DoubleVec1d& y, const StringVec1d& Id){
 
-        cout << "ID : RegionName, LatitudeRadians, LongitudeRadians" << endl;
+  std::cout << "ID : RegionName, LatitudeRadians, LongitudeRadians" << std::endl;
 
 	for(unsigned long i=0; i<Region.size(); i++){
 		if(Region[i]>=0)
-		cout << Id[i] << " : " << RegionName[Region[i]] << "," << x[Region[i]] << "," << y[Region[i]] << endl;
+		  std::cout << Id[i] << " : " << RegionName[Region[i]] << "," << x[Region[i]] << "," << y[Region[i]] << std::endl;
 		else
-			cout << Id[i] << " : " << Region[i] << endl;
+			std::cout << Id[i] << " : " << Region[i] << std::endl;
 	}
 }
 
 
-static void input_positions_data(const Config& config, ifstream & input, vector<double> & x, vector<double> & y, vector<string> & RegionName, vector<int> & SubRegion, vector<int> & Region, vector<int> & Perm, vector<int> & RegionsPresent)
+static void input_positions_data(const Config& config, std::ifstream& input, DoubleVec1d& x, DoubleVec1d& y, StringVec1d& RegionName, IntVec1d& SubRegion, IntVec1d& Perm, IntVec1d& RegionsPresent)
 {
   // What this code does:  It takes RegionsPresent, which is a list of the regions referred to by
   // the genotypes file data, and treats it as establishing a canonical order of the regions which
@@ -707,11 +699,11 @@ static void input_positions_data(const Config& config, ifstream & input, vector<
 
   // rewritten completely for robustness
   int regnum, regindex;
-  string regname;
+  std::string regname;
   double tempx, tempy;
   int subregion=FLAGINT;
   // deque rather than vector to avoid vector<bool>
-  deque<bool> regionsfound(RegionsPresent.size(),false);
+  std::deque<bool> regionsfound(RegionsPresent.size(),false);
 
   while (input) {
     // read all of the data from one line
@@ -727,7 +719,7 @@ static void input_positions_data(const Config& config, ifstream & input, vector<
 
     // -1 meaning "unknown" should not be in locations file
     if (regnum <0) {
-      cout << "Negative region numbers not allowed in locations file" << endl;
+      std::cout << "Negative region numbers not allowed in locations file" << std::endl;
       exit(-1);
     }
 
@@ -743,7 +735,7 @@ static void input_positions_data(const Config& config, ifstream & input, vector<
     // if so, capture its information; if not it will be silently discarded
     if(found) { 
       if(regionsfound[regindex]) {   // it's a duplicate; abend
-        cout << "Region number " << regnum << " appears 2 or more times in the location file" << endl;
+        std::cout << "Region number " << regnum << " appears 2 or more times in the location file" << std::endl;
         exit(-1);
       }
       regionsfound[regindex] = true;
@@ -753,9 +745,9 @@ static void input_positions_data(const Config& config, ifstream & input, vector<
       y[Perm[regindex]] = PI * tempy / 180.0;
       // echo for quality control; should probably be conditional
       if(config.echoInputs) {
-        cout << regname << "\t" << regnum << "\t";
-        if (config.useSubregion) cout << subregion << "\t";
-        cout << tempy << "\t" << tempx << endl;
+        std::cout << regname << "\t" << regnum << "\t";
+        if (config.useSubregion) std::cout << subregion << "\t";
+        std::cout << tempy << "\t" << tempx << std::endl;
       }
     }
   }
@@ -765,7 +757,7 @@ static void input_positions_data(const Config& config, ifstream & input, vector<
   for(unsigned long i = 0; i < regionsfound.size(); ++i) {
     if (regionsfound[i] == false) {
       problem_found = true;
-      cout << "Region " << RegionsPresent[i] << " " << regname << " not found in location file" << endl;
+      std::cout << "Region " << RegionsPresent[i] << " " << regname << " not found in location file" << std::endl;
     }
   }
   if(problem_found) exit(-1);
@@ -776,7 +768,7 @@ static void input_positions_data(const Config& config, ifstream & input, vector<
   string regionname;
   int subregion=FLAGINT;     
   double tempx,tempy;
-  cout << "Inputting location information" << endl;
+  std::cout << "Inputting location information" << std::endl;
   unsigned long r=0;
   // deque rather than vector to avoid vector<bool>
   deque<bool> regionsfound(RegionsPresent.size(),false);
@@ -793,8 +785,8 @@ static void input_positions_data(const Config& config, ifstream & input, vector<
     }
     
     if(region_index <(-1) ){ 
-      cerr << "Error in numbering of locations in location file" << endl;
-      cerr << "Line of file = " << (r+1) << endl;
+      std::cerr << "Error in numbering of locations in location file" << std::endl;
+      std::cerr << "Line of file = " << (r+1) << std::endl;
       exit(1);
     }
     
@@ -810,7 +802,7 @@ static void input_positions_data(const Config& config, ifstream & input, vector<
        // convert x and y into radians (x and y should be decimal lat and long)
        x[Perm[region]] = PI * tempx / 180.0; 
        y[Perm[region]] = PI * tempy / 180.0;
-       cout << original_region << " "  << regionname << " " << to_degrees(y[Perm[region]]) << " " << to_degrees(x[Perm[region]]) << endl;
+       std::cout << original_region << " "  << regionname << " " << to_degrees(y[Perm[region]]) << " " << to_degrees(x[Perm[region]]) << std::endl;
        r++;
     } else {
       input >> tempy;
@@ -820,37 +812,37 @@ static void input_positions_data(const Config& config, ifstream & input, vector<
 #endif
 }
 
-static void output_genotypes(const Config& config, const vector<vector<vector<int> > > & Genotype, const vector<string> & Id)
+static void output_genotypes(const Config& config, const IntVec3d& Genotype, const StringVec1d& Id)
 {
   for (int i = 0; i < config.numInd; i++) {
     for(int chrom=0; chrom<2; chrom++){
-      cout << "Individual " << Id[i]  <<  " : ";
+      std::cout << "Individual " << Id[i]  <<  " : ";
       for(int locus=0; locus<config.numLoci; locus++){
-	cout << Genotype[i][chrom][locus] << " ";
+        std::cout << Genotype[i][chrom][locus] << " ";
       }
-      cout << endl;
+      std::cout << std::endl;
     }
   }
 }
 
 // DEBUG
-static void recode_genotypes(const Config& config, vector<vector<vector<int> > > & OriginalGenotype, vector<vector<vector<int> > > & RecodedGenotype, vector<map<int,int> >& Coding, std::vector<int> &numAllele)
+static void recode_genotypes(const Config& config, const IntVec3d& OriginalGenotype, IntVec3d& RecodedGenotype, MapVec1d& Coding, IntVec1d& numAllele)
 {
 	RecodedGenotype = OriginalGenotype; 
   for(int locus=0; locus<config.numLoci; locus++){
-    vector<int> AllelesPresent;
+    IntVec1d AllelesPresent;
     for (int ind = 0; ind < config.numInd; ind++) {
       for(int chrom=0; chrom<2; chrom++){
 	int allele = OriginalGenotype[ind][chrom][locus];
 	if(allele>=0){
-	  if(find(AllelesPresent.begin(),AllelesPresent.end(),allele)==AllelesPresent.end()) // if allele is not in current list of AllelesPresent, add it
+	  if(std::find(AllelesPresent.begin(),AllelesPresent.end(),allele)==AllelesPresent.end()) // if allele is not in current list of AllelesPresent, add it
 	    AllelesPresent.push_back(allele);	
 	}
 	else
 	  RecodedGenotype[ind][chrom][locus] = allele;
       }
     }
-    sort(AllelesPresent.begin(),AllelesPresent.end());
+    std::sort(AllelesPresent.begin(),AllelesPresent.end());
     numAllele.push_back(AllelesPresent.size());
 	
     for(unsigned long allele =0; allele<AllelesPresent.size(); allele++){
@@ -866,22 +858,22 @@ static void recode_genotypes(const Config& config, vector<vector<vector<int> > >
   }
 }
 
-static void SubtractFromCount(const Config& config, int ind, IntVec4d& Count, IntVec3d& SumCount, vector<int> & Region, vector<int> & Species, vector<vector<vector<int> > > & Genotype)
+static void SubtractFromCount(const Config& config, int ind, IntVec4d& Count, IntVec3d& SumCount, const IntVec1d& Region, const IntVec1d& Species, const IntVec3d& Genotype)
 {
   if(Region[ind]>=0){
     for(int chrom=0; chrom<2; chrom++){
       for(int locus=0; locus<config.numLoci; locus++){
-	if(Genotype[ind][chrom][locus]>=0){
-	  Count[Region[ind]][Species[ind]][locus][Genotype[ind][chrom][locus]]--;
-	  SumCount[Region[ind]][Species[ind]][locus]--;
-	}
+        if(Genotype[ind][chrom][locus]>=0){
+          Count[Region[ind]][Species[ind]][locus][Genotype[ind][chrom][locus]]--;
+          SumCount[Region[ind]][Species[ind]][locus]--;
+        }
       }
     }
   }
 }
 
 
-static void AddToCount(const Config& config, int ind, IntVec4d& Count, IntVec3d& SumCount, vector<int> & Region, vector<int> & Species, vector<vector<vector< int> > > & Genotype)
+static void AddToCount(const Config& config, int ind, IntVec4d& Count, IntVec3d& SumCount, const IntVec1d& Region, const IntVec1d& Species, const IntVec3d& Genotype)
 {
   if(Region[ind]>=0){
     for(int chrom=0; chrom<2; chrom++){
@@ -896,14 +888,14 @@ static void AddToCount(const Config& config, int ind, IntVec4d& Count, IntVec3d&
 }
 
 
-static void count_up_alleles(const Config& config, IntVec4d& Count, vector<int> & Region, vector<int> & Species, vector<vector<vector< int> > > & Genotype)
+static void count_up_alleles(const Config& config, IntVec4d& Count, const IntVec1d& Region, const IntVec1d& Species, const IntVec3d& Genotype)
 {
   for (int r = 0; r < config.numRegion; r++) {
     for (int k = 0; k < config.numSpecies; k++) {
       for (int l = 0; l < config.numLoci; l++) {
         for (int j = 0; j < config.numAllele[l]; j++) {
           Count[r][k][l][j] = config.pseudocount; // start by adding 1 to every allele as a "pseudo-count" 
-	  //to avoid possible problems with non-observed alleles having very low freq estimates
+          //to avoid possible problems with non-observed alleles having very low freq estimates
         }
       }
     }
@@ -913,10 +905,10 @@ static void count_up_alleles(const Config& config, IntVec4d& Count, vector<int> 
     for(int chrom=0; chrom<2; chrom++){
       for (int locus = 0; locus < config.numLoci; locus++) {
         if(Region[i]>=0){
-	  if(Genotype[i][chrom][locus]>=0){
-	    Count[Region[i]][Species[i]][locus][Genotype[i][chrom][locus]]++;
-	  }
-	}
+          if(Genotype[i][chrom][locus]>=0){
+            Count[Region[i]][Species[i]][locus][Genotype[i][chrom][locus]]++;
+          }
+        }
       }
     }
   }
@@ -937,7 +929,7 @@ static void calc_SumCount(const Config& config, const IntVec4d& Count, IntVec3d&
 }
 
 // compute prob of individual's genotype as hybrid of region r and s
-static double log_hybrid_Prob(const Config& config, const IntVec4d& Count, const IntVec3d& SumCount,vector<vector<vector< int> > > &  Genotype, int ind, int r, int s)
+static double log_hybrid_Prob(const Config& config, const IntVec4d& Count, const IntVec3d& SumCount, const IntVec3d& Genotype, int ind, int r, int s)
 {
   int k=0;
 
@@ -951,20 +943,19 @@ static double log_hybrid_Prob(const Config& config, const IntVec4d& Count, const
       ps0 = (1-config.delta) * (Count[s][k][l][Genotype[ind][0][l]] + 1.0)/(SumCount[s][k][l]+config.numAllele[l]) + config.delta/config.numAllele[l];
       ps1 = (1-config.delta) * (Count[s][k][l][Genotype[ind][1][l]] + 1.0)/(SumCount[s][k][l]+config.numAllele[l]) + config.delta/config.numAllele[l];
       if(Genotype[ind][0][l] == Genotype[ind][1][l]) // if homozygote
-	llocusprob += log( config.nullAlleleProb * 0.5 * (pr0 + ps0) + (1-config.nullAlleleProb) * (pr0 * ps0));
+        llocusprob += std::log( config.nullAlleleProb * 0.5 * (pr0 + ps0) + (1-config.nullAlleleProb) * (pr0 * ps0));
       else{
-	double mult = 1;
-	llocusprob += log((1-config.nullAlleleProb) * mult * (pr0 * ps1 + pr1 * ps0));
+        double mult = 1;
+        llocusprob += std::log((1-config.nullAlleleProb) * mult * (pr0 * ps1 + pr1 * ps0));
       }
     }
     lprob += llocusprob;
   }
   return lprob;
-
 }
 
 
-static double log_hybrid_Prob(const Config& config, const DoubleVec4d& Freq,vector<vector<vector<int> > > & Genotype, int ind, int r, int s)
+static double log_hybrid_Prob(const Config& config, const DoubleVec4d& Freq, const IntVec3d& Genotype, int ind, int r, int s)
 {
   int k=0;
 
@@ -978,20 +969,19 @@ static double log_hybrid_Prob(const Config& config, const DoubleVec4d& Freq,vect
       ps0 = (1-config.delta) * Freq[s][k][l][Genotype[ind][0][l]] + config.delta/config.numAllele[l];
       ps1 = (1-config.delta) * Freq[s][k][l][Genotype[ind][1][l]] + config.delta/config.numAllele[l];
       if(Genotype[ind][0][l] == Genotype[ind][1][l]) // if homozygote
-	llocusprob += log( config.nullAlleleProb * 0.5 * (pr0 + ps0) + (1-config.nullAlleleProb) * (pr0 * ps0));
+        llocusprob += std::log( config.nullAlleleProb * 0.5 * (pr0 + ps0) + (1-config.nullAlleleProb) * (pr0 * ps0));
       else{
-	double mult = 1;
-	llocusprob += log((1-config.nullAlleleProb) * mult * (pr0 * ps1 + pr1 * ps0));
+        double mult = 1;
+        llocusprob += std::log((1-config.nullAlleleProb) * mult * (pr0 * ps1 + pr1 * ps0));
       }
     }
     lprob += llocusprob;
   } 
   return lprob;
-
 }
 
 
-static void calc_ExpTheta_and_SumExpTheta(const Config& config, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, 
+static void calc_ExpTheta_and_SumExpTheta(const Config& config, const DoubleVec4d& Theta, DoubleVec4d& ExpTheta, 
   DoubleVec3d& SumExpTheta)
 {
   for (int r = 0; r < config.numRegion; r++) {
@@ -999,7 +989,7 @@ static void calc_ExpTheta_and_SumExpTheta(const Config& config, DoubleVec4d& The
       for (int l = 0; l < config.numLoci; l++) {
         SumExpTheta[r][k][l] = 0;
         for (int j = 0; j < config.numAllele[l]; j++) {
-          ExpTheta[r][k][l][j] = exp(Theta[r][k][l][j]);
+          ExpTheta[r][k][l][j] = std::exp(Theta[r][k][l][j]);
 	  SumExpTheta[r][k][l] += ExpTheta[r][k][l][j];
         }
       }
@@ -1007,24 +997,24 @@ static void calc_ExpTheta_and_SumExpTheta(const Config& config, DoubleVec4d& The
   }
 }
 
-static void output_counts(const Config& config, const IntVec4d& Count, vector<int> & Perm)
+static void output_counts(const Config& config, const IntVec4d& Count, const IntVec1d & Perm)
 {
   for (int r = 0; r < config.numRegion; r++) {
     for (int k = 0; k < config.numSpecies; k++) {
       for (int l = 0; l < config.numLoci; l++) {
         for (int j = 0; j < config.numAllele[l]; j++) {
-          cout << Perm[r] << "," << k  << "," << l  << "," << j  << ":" << Count[r][k][l][j] << endl;
+          std::cout << Perm[r] << "," << k  << "," << l  << "," << j  << ":" << Count[r][k][l][j] << std::endl;
         }
       }
     }
   }
 }
 
-static double FittedCovariance(const Config& config, const vector<double> & Alpha, double d){
+static double FittedCovariance(const Config& config, const DoubleVec1d & Alpha, double d){
   
   if(d>0){
     if(config.useSpatial)
-      return exp( - exp(Alpha[2]* log(d / Alpha[1])) );
+      return std::exp( - std::exp(Alpha[2]* std::log(d / Alpha[1])) );
     else
       return 0;
   }
@@ -1057,7 +1047,6 @@ static double Covariance(const Config& config, int r0, int k0, int r1, int k1, c
   Er0k0r1k1 /= total;
 
   return (Er0k0r1k1 - Er0k0*Er1k1);
-
 }
 
 // as above, but correlation
@@ -1088,7 +1077,6 @@ static double Correlation(const Config& config, int r0, int k0, int r1, int k1, 
   Er0k0r1k1 /= total;
 
   return (Er0k0r1k1 - Er0k0*Er1k1)/sqrt((E2r0k0-Er0k0*Er0k0)*(E2r1k1-Er1k1*Er1k1));
-
 }
 
 // (sample) covariance of thetas at locus "locus" in region r0 and r1; species k0 and k1
@@ -1154,7 +1142,7 @@ static double Distance(double x1, double y1, double x2, double y2){
 
 
 // distance between region r and region s
-static double Distance(int r, int s, vector<double> & Xcoord, vector<double> & Ycoord){
+static double Distance(int r, int s, const DoubleVec1d& Xcoord, const DoubleVec1d& Ycoord){
   return Distance(Xcoord[r], Ycoord[r], Xcoord[s], Ycoord[s]);
 }
 
@@ -1164,7 +1152,7 @@ static void cholesky_in_place(DoubleVec1d& myL, int nregion);
 // previously used the Lapack routine dpotrf but now uses Joe Felsenstein's
 // hand version, as this allows error correction; the dpotrf version would
 // fail on some data, especially SNP data
-static void calc_L(const Config& config, DoubleVec1d& L, const vector<double> & Alpha, vector<double> & Xcoord, vector<double> & Ycoord)
+static void calc_L(const Config& config, DoubleVec1d& L, const DoubleVec1d& Alpha, const DoubleVec1d& Xcoord, const DoubleVec1d& Ycoord)
 {
   for (int r = 0; r < config.numRegion; r++) {
     for (int s = 0; s < config.numRegion; s++) {
@@ -1179,14 +1167,14 @@ static void calc_L(const Config& config, DoubleVec1d& L, const vector<double> & 
   dpotrf_(UPLO,config.numRegion,L,config.numRegion,INFO);
   // INFO returns something about whether the computation was successful
   if(INFO>0) {
-    cerr << "Warning: INFO=" << INFO << endl;
-    cerr << "This probably means likelihood calculation has failed due to variable " << INFO << endl;
-    cerr << "If the message continues to appear after burn-in the results cannot be trusted." << endl;
+    std::cerr << "Warning: INFO=" << INFO << std::endl;
+    std::cerr << "This probably means likelihood calculation has failed due to variable " << INFO << std::endl;
+    std::cerr << "If the message continues to appear after burn-in the results cannot be trusted." << std::endl;
   }
   if(INFO<0) {
-    cerr << "Warning: INFO=" << INFO << endl;
-    cerr << "This probably means an illegal value in variable " << INFO << endl;
-    cerr << "If the message continues to appear after burn-in the results cannot be trusted." << endl;
+    std::cerr << "Warning: INFO=" << INFO << std::endl;
+    std::cerr << "This probably means an illegal value in variable " << INFO << std::endl;
+    std::cerr << "If the message continues to appear after burn-in the results cannot be trusted." << std::endl;
   }
 #endif
 }
@@ -1209,7 +1197,7 @@ static void calc_LogLik(const Config& config, DoubleVec3d& LogLik, const DoubleV
     for (int k = 0; k < config.numSpecies; k++) {
       for (int l = 0; l < config.numLoci; l++) {
         LogLik[r][k][l] = 0;
-	LogLik[r][k][l] -= SumCount[r][k][l] * log(SumExpTheta[r][k][l]);
+	LogLik[r][k][l] -= SumCount[r][k][l] * std::log(SumExpTheta[r][k][l]);
         for (int j = 0; j < config.numAllele[l]; j++) {
           LogLik[r][k][l] += Count[r][k][l][j] * Theta[r][k][l][j];
         }
@@ -1225,10 +1213,10 @@ static double calc_LogLikWithoutPseudoCounts(const Config& config, const DoubleV
   for (int r = 0; r < config.numRegion; r++) {
     for (int k = 0; k < config.numSpecies; k++) {
       for (int l = 0; l < config.numLoci; l++) {
-        loglik -= (SumCount[r][k][l]-config.pseudocount * config.numAllele[l]) * log(SumExpTheta[r][k][l]);
-	for(int j=0; j<config.numAllele[l]; j++){
-	  loglik += (Count[r][k][l][j]-config.pseudocount) * Theta[r][k][l][j];	  
-	}
+        loglik -= (SumCount[r][k][l]-config.pseudocount * config.numAllele[l]) * std::log(SumExpTheta[r][k][l]);
+        for(int j=0; j<config.numAllele[l]; j++){
+          loglik += (Count[r][k][l][j]-config.pseudocount) * Theta[r][k][l][j];	  
+        }
       }
     }
   }
@@ -1257,7 +1245,7 @@ static void NormaliseMeanCov(const Config& config, DoubleVec4d& MeanCov, DoubleV
       for (int r1 = 0; r1 < config.numRegion; r1++) {
         for (int k1 = 0; k1 < config.numSpecies; k1++) {
           MeanCov[r][k][r1][k1] /= totaliter;
-	  MeanFittedCov[r][k][r1][k1] /= totaliter;
+          MeanFittedCov[r][k][r1][k1] /= totaliter;
         }
       }
     }
@@ -1267,15 +1255,15 @@ static void NormaliseMeanCov(const Config& config, DoubleVec4d& MeanCov, DoubleV
 //
 // keep a running count of the posterior means of some of the quantities
 //
-static void UpdateMeans(const Config& config, const DoubleVec4d& ExpTheta, DoubleVec4d& X, vector<vector<double> > & Pi, const DoubleVec3d& SumExpTheta, DoubleVec4d& MeanFreq, DoubleVec4d& MeanX, DoubleVec4d& MeanX2, vector<vector<double> > & MeanPi, DoubleVec4d& MeanCov, DoubleVec4d& MeanFittedCov, DoubleVec4d& MeanCor, DoubleVec4d& MeanFittedCor, vector<double> & Alpha, vector<double> & Xcoord, vector<double> & Ycoord, const DoubleVec4d& Theta, const DoubleVec2d& Mu, const DoubleVec3d& Nu)
+static void UpdateMeans(const Config& config, const DoubleVec4d& ExpTheta, const DoubleVec4d& X, const DoubleVec2d& Pi, const DoubleVec3d& SumExpTheta, DoubleVec4d& MeanFreq, DoubleVec4d& MeanX, DoubleVec4d& MeanX2, DoubleVec2d& MeanPi, DoubleVec4d& MeanCov, DoubleVec4d& MeanFittedCov, DoubleVec4d& MeanCor, DoubleVec4d& MeanFittedCor, const DoubleVec1d& Alpha, const DoubleVec1d& Xcoord, const DoubleVec1d& Ycoord, const DoubleVec4d& Theta, const DoubleVec2d& Mu, const DoubleVec3d& Nu)
 {
   for (int r = 0; r < config.numRegion; r++) {
     for (int k = 0; k < config.numSpecies; k++) {
       for (int l = 0; l < config.numLoci; l++) {
         for (int allele = 0; allele < config.numAllele[l]; allele++) {
           MeanFreq[r][k][l][allele] += ExpTheta[r][k][l][allele]/SumExpTheta[r][k][l];
-	  MeanX[r][k][l][allele] += X[r][k][l][allele];
-	  MeanX2[r][k][l][allele] += X[r][k][l][allele] * X[r][k][l][allele];
+          MeanX[r][k][l][allele] += X[r][k][l][allele];
+          MeanX2[r][k][l][allele] += X[r][k][l][allele] * X[r][k][l][allele];
         }
       }
       MeanPi[r][k] += Pi[r][k];
@@ -1283,9 +1271,9 @@ static void UpdateMeans(const Config& config, const DoubleVec4d& ExpTheta, Doubl
       for (int r1 = 0; r1 < config.numRegion; r1++) {
         for (int k1 = 0; k1 < config.numSpecies; k1++) {
           MeanCov[r][k][r1][k1] += Covariance(config,r,k,r1,k1,Theta,Mu,Nu);
-	  MeanFittedCov[r][k][r1][k1] += FittedCovariance(config,Alpha,Distance(r,r1,Xcoord,Ycoord))/Alpha[0]; // should really have separate Alpha for each k!?
-	  MeanCor[r][k][r1][k1] += Covariance(config,r,k,r1,k1,Theta,Mu,Nu) * Alpha[0];
-	  MeanFittedCor[r][k][r1][k1] += FittedCovariance(config,Alpha,Distance(r,r1,Xcoord,Ycoord)); // should really have separate Alpha for each k!?
+          MeanFittedCov[r][k][r1][k1] += FittedCovariance(config,Alpha,Distance(r,r1,Xcoord,Ycoord))/Alpha[0]; // should really have separate Alpha for each k!?
+          MeanCor[r][k][r1][k1] += Covariance(config,r,k,r1,k1,Theta,Mu,Nu) * Alpha[0];
+          MeanFittedCor[r][k][r1][k1] += FittedCovariance(config,Alpha,Distance(r,r1,Xcoord,Ycoord)); // should really have separate Alpha for each k!?
         }
       }
     }
@@ -1296,7 +1284,7 @@ static void UpdateMeans(const Config& config, const DoubleVec4d& ExpTheta, Doubl
 // (trying to assign each individual to one or other region/species on the basis
 // of its genotype)
 // Compute prob of individual ind's genotype, for each subregion, species combination
-static void UpdateSubRegionProb(const Config& config, const DoubleVec4d& ExpTheta, const DoubleVec3d& SumExpTheta, double *** SubRegionProb, vector<vector<vector<int> > > & Genotype, vector<int> & SubRegion)
+static void UpdateSubRegionProb(const Config& config, const DoubleVec4d& ExpTheta, const DoubleVec3d& SumExpTheta, double *** SubRegionProb, const IntVec3d& Genotype, const IntVec1d& SubRegion)
 {
   for (int ind = 0; ind < config.numInd; ind++) {
     for (int r = 0; r < config.numRegion; r++) {
@@ -1304,10 +1292,10 @@ static void UpdateSubRegionProb(const Config& config, const DoubleVec4d& ExpThet
         double prob = 1;
         for (int l = 0; l < config.numLoci; l++) {
           for(int chr =0; chr <2; chr++){
-	    if(Genotype[ind][chr][l]>=0){
-	      prob *= ExpTheta[r][k][l][Genotype[ind][chr][l]]/SumExpTheta[r][k][l];
-	    }	
-  	  }
+            if(Genotype[ind][chr][l]>=0){
+              prob *= ExpTheta[r][k][l][Genotype[ind][chr][l]]/SumExpTheta[r][k][l];
+            }	
+          }
         }
         SubRegionProb[ind][SubRegion[r]][k] += prob;
       }
@@ -1318,9 +1306,9 @@ static void UpdateSubRegionProb(const Config& config, const DoubleVec4d& ExpThet
 
 
 // Compute prob of individual ind's genotype, at each locus, for each region, species combination.
-static void UpdateLocusMeanProb(const Config& config, int ind, const DoubleVec4d& ExpTheta, const DoubleVec3d& SumExpTheta, DoubleVec4d& LocusMeanProb, vector<vector<vector<int> > > & Genotype)
+static void UpdateLocusMeanProb(const Config& config, int ind, const DoubleVec4d& ExpTheta, const DoubleVec3d& SumExpTheta, DoubleVec4d& LocusMeanProb, const IntVec3d& Genotype)
 { 
-  //  cout << "Ind = " << ind << endl;
+  //  std::cout << "Ind = " << ind << std::endl;
   double llocusprob;
 
   for (int r = 0; r < config.numRegion; r++) {
@@ -1338,20 +1326,20 @@ static void UpdateLocusMeanProb(const Config& config, int ind, const DoubleVec4d
 	  p2 = (1-config.delta) * ExpTheta[r][k][l][allele2]/SumExpTheta[r][k][l] + config.delta/config.numAllele[l];
 	}
 	if(allele1==allele2){
-	  llocusprob += log( config.nullAlleleProb*p1 + (1-config.nullAlleleProb) * p1 * p1);
+	  llocusprob += std::log( config.nullAlleleProb*p1 + (1-config.nullAlleleProb) * p1 * p1);
 	} else {
 	  if(allele1>=0){
-	    llocusprob += log ( (1-config.nullAlleleProb) * p1 * p2);
+	    llocusprob += std::log ( (1-config.nullAlleleProb) * p1 * p2);
 	  }
 	}
-	LocusMeanProb[ind][r][k][l] += exp(llocusprob);
+	LocusMeanProb[ind][r][k][l] += std::exp(llocusprob);
       }
     }
   }
 }
 
 // compute probs for all individuals
-static void UpdateLocusMeanProb(const Config& config, const DoubleVec4d& ExpTheta, const DoubleVec3d& SumExpTheta, DoubleVec4d& LocusMeanProb, vector<vector<vector<int> > > & Genotype)
+static void UpdateLocusMeanProb(const Config& config, const DoubleVec4d& ExpTheta, const DoubleVec3d& SumExpTheta, DoubleVec4d& LocusMeanProb, const IntVec3d& Genotype)
 {
   for (int ind = 0; ind < config.numInd; ind++) {
     UpdateLocusMeanProb(config, ind, ExpTheta, SumExpTheta, LocusMeanProb, Genotype);
@@ -1360,7 +1348,7 @@ static void UpdateLocusMeanProb(const Config& config, const DoubleVec4d& ExpThet
 
 
 
-static void NormaliseMeanPi(const Config& config, vector<vector<double> > & MeanPi)
+static void NormaliseMeanPi(const Config& config, DoubleVec2d& MeanPi)
 {
 
   for (int r = 0; r < config.numRegion; r++) {
@@ -1374,7 +1362,7 @@ static void NormaliseMeanPi(const Config& config, vector<vector<double> > & Mean
   }
 }
 
-static void NormaliseMeanFreq(const Config& config, DoubleVec4d& MeanFreq,double totaliter){
+static void NormaliseMeanFreq(const Config& config, DoubleVec4d& MeanFreq, double totaliter){
   for (int l = 0; l < config.numLoci; l++) {
     for (int r = 0; r < config.numRegion; r++) {
       for (int allele = 0; allele < config.numAllele[l]; allele++) {
@@ -1384,16 +1372,15 @@ static void NormaliseMeanFreq(const Config& config, DoubleVec4d& MeanFreq,double
   }
 }
 
-
 // modified to avoid underflow; it's slower but this runs only once
 static void ComputeLogMeanProb(const Config& config, DoubleVec3d& MeanProb, const DoubleVec4d& LocusMeanProb, double totaliter){
-  double ltiter = log(totaliter);
+  double ltiter = std::log(totaliter);
   for (int ind = 0; ind < config.numInd; ind++) {
     for (int r = 0; r < config.numRegion; r++) {
       for (int k = 0; k < config.numSpecies; k++) {
         double logmp = 0;
         for (int l = 0; l < config.numLoci; l++) {
-          logmp += log(LocusMeanProb[ind][r][k][l]) - ltiter;
+          logmp += std::log(LocusMeanProb[ind][r][k][l]) - ltiter;
         }
         MeanProb[ind][r][k] = logmp;
       }
@@ -1418,23 +1405,23 @@ static void NormaliseSubRegionProb(const Config& config, DoubleVec3d& SubRegionP
 }
 
 // some output routines
-static void OutputPi(const Config& config, vector<vector<double> > & Pi,vector<string> & RegionName,ostream & ostr, vector<int> & Perm){
+static void OutputPi(const Config& config, const DoubleVec2d& Pi, StringVec1d& RegionName, std::ostream& ostr, const IntVec1d& Perm) {
   for (int k = 0; k < config.numSpecies; k++) {
     for(unsigned long r = 0; r<Pi.size(); r++){
-      //ostr.setf(ios::fixed);
-      ostr.setf(ios::showpoint);
+      //ostr.setf(std::ios::fixed);
+      ostr.setf(std::ios::showpoint);
       ostr.precision(2); 
       ostr << Pi[Perm[r]][k] << "  ";
     }
   }
-  ostr << endl;
+  ostr << std::endl;
 }
   
 
-static void OutputLogMeanProb(const Config& config, const DoubleVec3d& MeanProb, ofstream & output, vector<int> & NMissing, vector<int> & Region, vector<string> & Id, vector<string> & RegionName, vector<int> & Perm, int first, int last, vector<int> & RegionsPresent)
+static void OutputLogMeanProb(const Config& config, const DoubleVec3d& MeanProb, std::ofstream& output, const IntVec1d& NMissing, const IntVec1d& Region, const StringVec1d& Id, const StringVec1d& RegionName, const IntVec1d& Perm, int first, int last, const IntVec1d& RegionsPresent)
 {
   if(!config.locate)
-    output << "Warning: these results not produced via the -A option, so not cross-validated" << endl;
+    output << "Warning: these results not produced via the -A option, so not cross-validated" << std::endl;
 
   output << "Id " << " " << "#Genotypes" << " Location" << " " << "Assigned" << " ";
   if(config.numSpecies>1)
@@ -1476,12 +1463,11 @@ static void OutputLogMeanProb(const Config& config, const DoubleVec3d& MeanProb,
         output << std::scientific <<  MeanProb[ind][Perm[r]][k] << " ";
       }
     }
-    output << endl;
+    output << std::endl;
   }
 }
 
-
-static void OutputLogMeanProb2(const Config& config, const DoubleVec4d& MeanFreq, vector<vector<vector<int> > > & Genotype, ostream & output, vector<int> & NMissing, vector<int> & Region, vector<int> & Perm)
+static void OutputLogMeanProb2(const Config& config, const DoubleVec4d& MeanFreq, const IntVec3d& Genotype, std::ostream& output, const IntVec1d& NMissing, const IntVec1d& Region, const IntVec1d& Perm)
 {
   for (int ind = 0; ind < config.numInd; ind++) {
     output << NMissing[ind] << " " << Region[ind] << " ";
@@ -1490,16 +1476,15 @@ static void OutputLogMeanProb2(const Config& config, const DoubleVec4d& MeanFreq
         output << std::scientific << log_hybrid_Prob(config, MeanFreq,Genotype, ind, Perm[r], Perm[r]) << " ";
       }
     }
-    output << endl;
+    output << std::endl;
   }
 }
 
-
-static void OutputParameters(const Config& config, ofstream & paramFile, vector<double> & Alpha, double & Beta, vector<double> & Gamma, vector<double> & Delta, double & Eta, const DoubleVec1d& Lambda, const DoubleVec3d& LogLik)
+static void OutputParameters(const Config& config, std::ofstream& paramFile, const DoubleVec1d& Alpha, double Beta, const DoubleVec1d& Gamma, const DoubleVec1d& Delta, double Eta, const DoubleVec1d& Lambda, const DoubleVec3d& LogLik)
 {
   for (unsigned long a = 0; a < config.alphaLen; a++)
     paramFile << Alpha[a] << " ";
-  paramFile <<  Beta <<  " ";
+  paramFile << Beta <<  " ";
   if (config.numSpecies > 1) {
     for (int k = 0; k < config.numSpecies; k++)
       paramFile << Gamma[k] << " ";
@@ -1509,10 +1494,9 @@ static void OutputParameters(const Config& config, ofstream & paramFile, vector<
     for (int k = 0; k < config.numSpecies; k++)
       paramFile << Lambda[k] << " ";
   }
-  paramFile <<  SumLogLik(config, LogLik);
-  paramFile << endl;     
-           
-}     
+  paramFile << SumLogLik(config, LogLik);
+  paramFile << std::endl;
+}
 
 // ------------------------- The MCMC update routines ---------------------
 
@@ -1523,9 +1507,9 @@ static void OutputParameters(const Config& config, ofstream & paramFile, vector<
 // update vector of allocation variables (Species) which holds
 // which species (= subpopulation) each individual is currently
 // assigned to
-static void update_Species(const Config& config, vector<int> & Species, vector< vector<double> > & Pi, vector<int> & Region, vector<vector<vector<int> > > & Genotype, const DoubleVec4d& ExpTheta, const DoubleVec3d& SumExpTheta)
+static void update_Species(const Config& config, IntVec1d& Species, const DoubleVec2d& Pi, const IntVec1d& Region, const IntVec3d& Genotype, const DoubleVec4d& ExpTheta, const DoubleVec3d& SumExpTheta)
 {
-  vector<double> Prob(config.numSpecies, 0);
+  DoubleVec1d Prob(config.numSpecies, 0);
   for (int ind = 0; ind < config.numInd; ind++) {
     int r = Region[ind]; 
     if(r>=0){
@@ -1548,8 +1532,7 @@ static void update_Species(const Config& config, vector<int> & Species, vector< 
   }
 }
 
-
-static void compute_Pi(const Config& config, DoubleVec2d& Pi, const DoubleVec2d& ExpPsi, const DoubleVec1d& SumExpPsi )
+static void compute_Pi(const Config& config, DoubleVec2d& Pi, const DoubleVec2d& ExpPsi, const DoubleVec1d& SumExpPsi)
 {
   for (int r = 0; r < config.numRegion; r++) {
     for (int k = 0; k < config.numSpecies; k++) {
@@ -1558,10 +1541,10 @@ static void compute_Pi(const Config& config, DoubleVec2d& Pi, const DoubleVec2d&
   }
 }
 
-static void update_Pi(const Config& config, vector< vector<double> > & Pi, vector<int> & Species, vector<int> & Region)
+static void update_Pi(const Config& config, DoubleVec2d& Pi, const IntVec1d& Species, const IntVec1d& Region)
 {
   for (int r = 0; r < config.numRegion; r++) {
-    vector<double> DirichletParam(config.numSpecies, 1); // set prior on Pi to be Di(0.1,0.1) [temporary to get something going]
+    DoubleVec1d DirichletParam(config.numSpecies, 1); // set prior on Pi to be Di(0.1,0.1) [temporary to get something going]
     for (int ind = 0; ind < config.numInd; ind++) {
       if(Region[ind] == r)
          DirichletParam[Species[ind]] ++;
@@ -1570,10 +1553,8 @@ static void update_Pi(const Config& config, vector< vector<double> > & Pi, vecto
   }
 }
 
-
-
 // update Nu (the species-specific adjustment to the background "ancestral" allele freqs)
-static void update_Nu(const Config& config, State& state, DoubleVec3d& Nu, vector<double> & Gamma, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& LogLik, DoubleVec3d& SumExpTheta, const IntVec4d& Count, const IntVec3d& SumCount)
+static void update_Nu(const Config& config, State& state, DoubleVec3d& Nu, const DoubleVec1d& Gamma, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& LogLik, DoubleVec3d& SumExpTheta, const IntVec4d& Count, const IntVec3d& SumCount)
 {
 
   double NewNu;
@@ -1591,15 +1572,15 @@ static void update_Nu(const Config& config, State& state, DoubleVec3d& Nu, vecto
 	LogLikRatio = Gamma[k] * 0.5 * (Nu[k][l][j] * Nu[k][l][j] - NewNu * NewNu); //prior on Nu[k][l][j] is N(0,1/Gamma[k]);
         for (int r = 0; r < config.numRegion; r++) {
           NewTheta[r][k] = Theta[r][k][l][j] - Nu[k][l][j] + NewNu;
-	  NewExpTheta[r][k] = exp(NewTheta[r][k]);
+	  NewExpTheta[r][k] = std::exp(NewTheta[r][k]);
 	  NewSumExpTheta[r][k] = SumExpTheta[r][k][l] - ExpTheta[r][k][l][j] + NewExpTheta[r][k];
 	  NewLogLik[r][k] = LogLik[r][k][l] 
 	    + Count[r][k][l][j] * (NewTheta[r][k] - Theta[r][k][l][j]) 
-	    - SumCount[r][k][l] * (log(NewSumExpTheta[r][k]) - log(SumExpTheta[r][k][l]));
+	    - SumCount[r][k][l] * (std::log(NewSumExpTheta[r][k]) - std::log(SumExpTheta[r][k][l]));
 	  LogLikRatio += NewLogLik[r][k] - LogLik[r][k][l];
         }
 
-        double A = exp(LogLikRatio); // acceptance prob
+        double A = std::exp(LogLikRatio); // acceptance prob
 	state.nu.attempt +=1;
 	if(distr(eng)<A ){ //accept move 
 	  state.nu.accept += 1;
@@ -1615,7 +1596,6 @@ static void update_Nu(const Config& config, State& state, DoubleVec3d& Nu, vecto
     }
   }
 }
-
 
 // update Mu (the background "ancestral" allele freqs)
 static void update_Mu(const Config& config, State& state, DoubleVec2d& Mu, double Beta, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& LogLik, DoubleVec3d& SumExpTheta, const IntVec4d& Count, const IntVec3d& SumCount)
@@ -1635,16 +1615,16 @@ static void update_Mu(const Config& config, State& state, DoubleVec2d& Mu, doubl
       for (int r = 0; r < config.numRegion; r++) {
         for (int k = 0; k < config.numSpecies; k++) {
           NewTheta[r][k] = Theta[r][k][l][j] - Mu[l][j] + NewMu;
-	  NewExpTheta[r][k] = exp(NewTheta[r][k]);
+	  NewExpTheta[r][k] = std::exp(NewTheta[r][k]);
 	  NewSumExpTheta[r][k] = SumExpTheta[r][k][l] - ExpTheta[r][k][l][j] + NewExpTheta[r][k];
 	  NewLogLik[r][k] = LogLik[r][k][l] 
 	    + Count[r][k][l][j] * (NewTheta[r][k] - Theta[r][k][l][j]) 
-	    - SumCount[r][k][l] * (log(NewSumExpTheta[r][k]) - log(SumExpTheta[r][k][l]));
+	    - SumCount[r][k][l] * (std::log(NewSumExpTheta[r][k]) - std::log(SumExpTheta[r][k][l]));
 	  LogLikRatio += NewLogLik[r][k] - LogLik[r][k][l];
         }
       }
 
-      double A = exp(LogLikRatio); // acceptance prob
+      double A = std::exp(LogLikRatio); // acceptance prob
 
       state.mu.attempt += 1;
       if(distr(eng)<A ){ //accept move 
@@ -1664,7 +1644,7 @@ static void update_Mu(const Config& config, State& state, DoubleVec2d& Mu, doubl
 }
 
 // update Lambda (the background species abundance)
-static void update_Lambda(const Config& config, State& state, DoubleVec1d& Lambda, double Eta, DoubleVec2d& Psi, DoubleVec2d& ExpPsi, DoubleVec1d& SumExpPsi, vector<int> & Region, vector<int> & Species)
+static void update_Lambda(const Config& config, State& state, DoubleVec1d& Lambda, double Eta, DoubleVec2d& Psi, DoubleVec2d& ExpPsi, DoubleVec1d& SumExpPsi, const IntVec1d& Region, const IntVec1d& Species)
 {
   static DoubleVec1d NewPsi(config.numRegion,0.0);
   static DoubleVec1d NewExpPsi(config.numRegion,0.0);
@@ -1676,7 +1656,7 @@ static void update_Lambda(const Config& config, State& state, DoubleVec1d& Lambd
 
     for (int r = 0; r < config.numRegion; r++) {
       NewPsi[r] = Psi[r][k] - Lambda[k] + NewLambda;
-      NewExpPsi[r] = exp(NewPsi[r]);
+      NewExpPsi[r] = std::exp(NewPsi[r]);
       NewSumExpPsi[r] = SumExpPsi[r] - ExpPsi[r][k] + NewExpPsi[r];
     }
 
@@ -1686,11 +1666,11 @@ static void update_Lambda(const Config& config, State& state, DoubleVec1d& Lambd
       if(r0>=0){
 	if(Species[ind] == k)
 	  LogLikRatio += NewPsi[r0] - Psi[r0][k];
-	LogLikRatio += log(SumExpPsi[r0]) - log(NewSumExpPsi[r0]);
+	LogLikRatio += std::log(SumExpPsi[r0]) - std::log(NewSumExpPsi[r0]);
       }
     }
 
-    double A = exp(LogLikRatio); // acceptance prob
+    double A = std::exp(LogLikRatio); // acceptance prob
         
     state.lambda.attempt += 1;
     if(distr(eng)<A ){ //accept move 
@@ -1705,7 +1685,7 @@ static void update_Lambda(const Config& config, State& state, DoubleVec1d& Lambd
   }
 }
 
-static void update_Alpha0(const Config& config, vector<double> & Alpha, const DoubleVec4d& X)
+static void update_Alpha0(const Config& config, DoubleVec1d& Alpha, const DoubleVec4d& X)
 {
   double sumsq = 0;
   int total =0;
@@ -1724,7 +1704,7 @@ static void update_Alpha0(const Config& config, vector<double> & Alpha, const Do
 }
 
 
-static void update_Delta0(const Config& config, vector<double> & Delta, const DoubleVec2d& Y)
+static void update_Delta0(const Config& config, DoubleVec1d& Delta, const DoubleVec2d& Y)
 {
   double sum = 0;
   int total =0;
@@ -1740,7 +1720,7 @@ static void update_Delta0(const Config& config, vector<double> & Delta, const Do
 
 // beta is the prior precision for Mu (ie Mu is N(0,1/Beta)
 // prior on beta is Gamma(NBETA,LBETA)
-static void update_Beta(const Config& config, double & Beta, const DoubleVec2d& Mu)
+static void update_Beta(const Config& config, double& Beta, const DoubleVec2d& Mu)
 {
   double sumsq = 0;
   int total =0;
@@ -1753,11 +1733,9 @@ static void update_Beta(const Config& config, double & Beta, const DoubleVec2d& 
   Beta = rgamma(0.5 * total + config.betaN, 0.5 * sumsq + config.betaL);
 }
 
-
-
 // Eta is the prior precision for Lambda (ie Lambda is N(0,1/Eta)
 // prior on Eta is Gamma(etaN,etaL)
-static void update_Eta(const Config& config, double & Eta, const DoubleVec1d& Lambda)
+static void update_Eta(const Config& config, double& Eta, const DoubleVec1d& Lambda)
 {
   double sum = 0;
   int total =0;
@@ -1767,7 +1745,6 @@ static void update_Eta(const Config& config, double & Eta, const DoubleVec1d& La
   }
   Eta = rgamma(0.5 * total + config.etaN, 0.5 * sum + config.etaL);
 }
-
 
 static bool InElephantRange(double x, double y){
   double x0,y0,x1,y1,a,b;
@@ -1864,7 +1841,7 @@ static bool InForest(double x,double y){
   b = y0 - a* x0;
   if( y < a*x + b){
     forest = true;
-    //cout << "Is to the west of Mole" << endl;
+    //std::cout << "Is to the west of Mole" << std::endl;
   }
   
   // now check the rest of the forest areas
@@ -1899,14 +1876,13 @@ static bool InForest(double x,double y){
   return forest;  
 }
 
-
 // This routine used to take LogLik by reference.  However, its internal
 // calculations are a different formula than the LogLik of the rest of
 // the program.  This required an immediate corrective call to calc_Loglik
 // after each call to this function, which was an accident waiting to
 // happen.  It now uses internal storage only.  -- Mary 12/30/2020
 
-static void update_Location(const Config& config, State& state, vector<double> & Alpha, const DoubleVec4d& X, const DoubleVec2d& Mu, const DoubleVec3d& Nu, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& SumExpTheta, DoubleVec3d& LogLik, DoubleVec1d& L, const IntVec4d& Count, const IntVec3d& SumCount, vector<double> & Xcoord, vector<double> & Ycoord, vector<int> & Species, vector<vector<vector<int> > > & Genotype, vector<int> & Region, vector<double> & BoundaryX, vector<double> & BoundaryY, const Mapgrid& mymapgrid)
+static void update_Location(const Config& config, State& state, const DoubleVec1d& Alpha, const DoubleVec4d& X, const DoubleVec2d& Mu, const DoubleVec3d& Nu, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& SumExpTheta, DoubleVec3d& LogLik, DoubleVec1d& L, const IntVec4d& Count, const IntVec3d& SumCount, DoubleVec1d& Xcoord, DoubleVec1d& Ycoord, const IntVec1d& Species, const IntVec3d& Genotype, const IntVec1d& Region, const DoubleVec1d& BoundaryX, const DoubleVec1d& BoundaryY, const Mapgrid& mymapgrid)
 {
   // has memory for NewTheta and NewExpTheta already been allocated?
   static bool already_allocated(false);
@@ -1929,8 +1905,8 @@ static void update_Location(const Config& config, State& state, vector<double> &
   }
 
   for(int rep = 0; rep < 10; rep++){
-    vector<double> NewXcoord(Xcoord);
-    vector<double> NewYcoord(Ycoord);
+    DoubleVec1d NewXcoord(Xcoord);
+    DoubleVec1d NewYcoord(Ycoord);
     double h; // proposal sd
     double LogLikRatio = 0;
     
@@ -1941,7 +1917,7 @@ static void update_Location(const Config& config, State& state, vector<double> &
       // do not bother with further details if proposed location is out of range
       if (!InRange(config,NewXcoord[config.numRegion-1],NewYcoord[config.numRegion-1],BoundaryX,BoundaryY,mymapgrid)) {
         // DEBUG
-        //TRACEFILE << to_degrees(NewXcoord[config.numRegion-1]) << " " << to_degrees(NewYcoord[config.numRegion-1]) << " Reject out of range" << endl;
+        //TRACEFILE << to_degrees(NewXcoord[config.numRegion-1]) << " " << to_degrees(NewYcoord[config.numRegion-1]) << " Reject out of range" << std::endl;
         continue;
       }
       LogLikRatio = 0; // Hastings ratio
@@ -1953,7 +1929,7 @@ static void update_Location(const Config& config, State& state, vector<double> &
       // do not bother with further details if proposed location is out of range
       if (!InRange(config,NewXcoord[config.numRegion-1],NewYcoord[config.numRegion-1],BoundaryX,BoundaryY,mymapgrid)) {
         // DEBUG
-        //TRACEFILE << to_degrees(NewXcoord[config.numRegion-1]) << " " << to_degrees(NewYcoord[config.numRegion-1]) << " Reject out of range" << endl;
+        //TRACEFILE << to_degrees(NewXcoord[config.numRegion-1]) << " " << to_degrees(NewYcoord[config.numRegion-1]) << " Reject out of range" << std::endl;
         continue;
       }
       double forwardsprob = 0; // prob density of proposed move
@@ -1962,7 +1938,7 @@ static void update_Location(const Config& config, State& state, vector<double> &
         forwardsprob += dnorm((NewXcoord[config.numRegion-1]-Xcoord[r])/h) * dnorm((NewYcoord[config.numRegion-1]-Ycoord[r])/h);
 	backwardsprob += dnorm((Xcoord[config.numRegion-1]-Xcoord[r])/h) * dnorm((Ycoord[config.numRegion-1]-Ycoord[r])/h);
       }
-      LogLikRatio = log(backwardsprob)-log(forwardsprob);
+      LogLikRatio = std::log(backwardsprob)-std::log(forwardsprob);
     }
 
 
@@ -1978,7 +1954,7 @@ static void update_Location(const Config& config, State& state, vector<double> &
             dnorm((Xcoord[config.numRegion - 1] - Xcoord[r]) / sqrt(h)) *
             dnorm((Ycoord[config.numRegion - 1] - Ycoord[r]) / sqrt(h));
       }
-      LogLikRatio += log(newprior)-log(oldprior);
+      LogLikRatio += std::log(newprior)-std::log(oldprior);
     }
       
     calc_L(config,NewL,Alpha,NewXcoord,NewYcoord);
@@ -1993,7 +1969,7 @@ static void update_Location(const Config& config, State& state, vector<double> &
 	for(int s = 0; s<=r; s++){
           NewTheta[l][j] += NewL[r + s * config.numRegion] * X[s][k][l][j];
         }
-	NewExpTheta[l][j] = exp(NewTheta[l][j]);
+	NewExpTheta[l][j] = std::exp(NewTheta[l][j]);
 	NewSumExpTheta[l] += NewExpTheta[l][j];
       }
     }
@@ -2022,29 +1998,29 @@ static void update_Location(const Config& config, State& state, vector<double> &
 	  }
 	  
 	  if(allele1 == allele2){
-	    NewLogLik[l] += log(config.nullAlleleProb*Newp1 + (1-config.nullAlleleProb) * Newp1 * Newp1);
-	    OldLogLik[l] += log( config.nullAlleleProb*p1 + (1-config.nullAlleleProb) * p1 * p1);
+	    NewLogLik[l] += std::log(config.nullAlleleProb*Newp1 + (1-config.nullAlleleProb) * Newp1 * Newp1);
+	    OldLogLik[l] += std::log( config.nullAlleleProb*p1 + (1-config.nullAlleleProb) * p1 * p1);
 	  }
 	  else{
-	    NewLogLik[l] += log((1-config.nullAlleleProb) *  Newp1 * Newp2);
-	    OldLogLik[l] += log((1-config.nullAlleleProb) *  p1 * p2 );
+	    NewLogLik[l] += std::log((1-config.nullAlleleProb) *  Newp1 * Newp2);
+	    OldLogLik[l] += std::log((1-config.nullAlleleProb) *  p1 * p2 );
 	  }
 	  
 	}
       }
       LogLikRatio += NewLogLik[l] - OldLogLik[l];
-      tempprob *= exp(OldLogLik[l]); 
+      tempprob *= std::exp(OldLogLik[l]); 
 
-      newtempprob *= exp(NewLogLik[l]);
+      newtempprob *= std::exp(NewLogLik[l]);
     }
 
     state.loc.attempt += 1;
-    double A = exp(LogLikRatio); // acceptance prob
+    double A = std::exp(LogLikRatio); // acceptance prob
     
     // test
     if(distr(eng)<A ){ //accept move
       // DEBUG
-      //TRACEFILE << to_degrees(NewXcoord[config.numRegion - 1]) << " " << to_degrees(NewYcoord[config.numRegion-1]) << " Accept" << endl;
+      //TRACEFILE << to_degrees(NewXcoord[config.numRegion - 1]) << " " << to_degrees(NewYcoord[config.numRegion-1]) << " Accept" << std::endl;
       state.loc.accept +=1;
        Xcoord = NewXcoord;
        Ycoord = NewYcoord;
@@ -2059,11 +2035,11 @@ static void update_Location(const Config& config, State& state, vector<double> &
 	 SumExpTheta[r][k][l] = NewSumExpTheta[l];
          for (int j = 0; j < config.numAllele[l]; j++) {
            Theta[r][k][l][j] = NewTheta[l][j];
-	   ExpTheta[r][k][l][j] = exp(NewTheta[l][j]);
+	   ExpTheta[r][k][l][j] = std::exp(NewTheta[l][j]);
          }
        }
     } else {
-      //TRACEFILE << to_degrees(NewXcoord[config.numRegion-1]) << " " << to_degrees(NewYcoord[config.numRegion-1]) << " Reject" << endl;
+      //TRACEFILE << to_degrees(NewXcoord[config.numRegion-1]) << " " << to_degrees(NewYcoord[config.numRegion-1]) << " Reject" << std::endl;
     }
   }
 
@@ -2073,7 +2049,7 @@ static void update_Location(const Config& config, State& state, vector<double> &
 
 
 // update the parameters in the covariance matrix 
-static void update_Alpha(const Config& config, State& state, vector<double> & Alpha, const DoubleVec4d& X, const DoubleVec2d& Mu, const DoubleVec3d& Nu, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& LogLik, DoubleVec3d& SumExpTheta, const IntVec4d& Count, const IntVec3d& SumCount, DoubleVec1d& L, vector<double> & Xcoord, vector<double> & Ycoord)
+static void update_Alpha(const Config& config, State& state, DoubleVec1d& Alpha, const DoubleVec4d& X, const DoubleVec2d& Mu, const DoubleVec3d& Nu, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& LogLik, DoubleVec3d& SumExpTheta, const IntVec4d& Count, const IntVec3d& SumCount, DoubleVec1d& L, const DoubleVec1d& Xcoord, const DoubleVec1d& Ycoord)
 {
   // have we already arranged memory for NewTheta and NewExpTheta?
   static bool already_allocated(false);
@@ -2106,7 +2082,7 @@ static void update_Alpha(const Config& config, State& state, vector<double> & Al
  	}
  	if( ValidateAssumptions ) {
  		if( RecursionCheck++ > 1 || config.numRegion !=FirstNREGION ) {
- 			cerr << "Assumption violated" << endl;
+ 			std::cerr << "Assumption violated" << std::endl;
  			exit(1);
  		}
  	}
@@ -2115,17 +2091,17 @@ static void update_Alpha(const Config& config, State& state, vector<double> & Al
 
   for (int alphaparam = 1; alphaparam < config.alphaLen; alphaparam++) {
     state.alpha[alphaparam].attempt += 1;
-    vector<double> NewAlpha(Alpha);
+    DoubleVec1d NewAlpha(Alpha);
   
     double LogLikRatio = 0;
     
     // random walk on log alphas
 
-    vector<double> AlphaUpdateSD = vector<double>(4, config.alphaUpdateSD);
+    DoubleVec1d AlphaUpdateSD = DoubleVec1d(4, config.alphaUpdateSD);
     double h=rnorm(0,AlphaUpdateSD[alphaparam]);
     
     if(alphaparam != 2){
-      NewAlpha[alphaparam] *= exp(h); // add h to log alpha
+      NewAlpha[alphaparam] *= std::exp(h); // add h to log alpha
     }
     else{
       NewAlpha[alphaparam] += h;
@@ -2149,7 +2125,7 @@ static void update_Alpha(const Config& config, State& state, vector<double> & Al
 	    for(int s = 0; s<=r; s++){
 	      NewTheta[r][k][l][j] += NewL[r+s*config.numRegion] * X[s][k][l][j];
 	    }
-            NewExpTheta[r][k][l][j] = exp(NewTheta[r][k][l][j]);
+            NewExpTheta[r][k][l][j] = std::exp(NewTheta[r][k][l][j]);
             NewSumExpTheta[r][k][l] += NewExpTheta[r][k][l][j];
           }
         }
@@ -2167,7 +2143,7 @@ static void update_Alpha(const Config& config, State& state, vector<double> & Al
       }
     }
 
-    double A = exp(LogLikRatio); // acceptance prob
+    double A = std::exp(LogLikRatio); // acceptance prob
     
     if(distr(eng)<A ){ //accept move 
       state.alpha[alphaparam].accept += 1;
@@ -2195,8 +2171,9 @@ static void update_Alpha(const Config& config, State& state, vector<double> & Al
   if( ValidateAssumptions ) RecursionCheck--;
 
 }
+
 // update the parameters in the covariance matrix M 
-static void update_Delta(const Config& config, State& state, vector<double> & Delta, const DoubleVec2d& Y, const DoubleVec1d& Lambda, DoubleVec2d& Psi, DoubleVec2d& ExpPsi, DoubleVec1d& SumExpPsi, vector<int> & Species, vector<int> & Region, DoubleVec1d& M, vector<double> & Xcoord, vector<double> & Ycoord)
+static void update_Delta(const Config& config, State& state, DoubleVec1d& Delta, const DoubleVec2d& Y, const DoubleVec1d& Lambda, DoubleVec2d& Psi, DoubleVec2d& ExpPsi, DoubleVec1d& SumExpPsi, const IntVec1d& Species, const IntVec1d& Region, DoubleVec1d& M, const DoubleVec1d& Xcoord, const DoubleVec1d& Ycoord)
 {
   // These don't need initialization as it's handled inline
   static DoubleVec2d NewPsi(config.numRegion,DoubleVec1d(config.numSpecies,0.0));
@@ -2209,17 +2186,17 @@ static void update_Delta(const Config& config, State& state, vector<double> & De
 
   for (int deltaparam = 1; deltaparam < config.deltaLen; deltaparam++) {
     state.delta[deltaparam].attempt +=1;
-    vector<double> NewDelta(Delta);
+    DoubleVec1d NewDelta(Delta);
   
     double LogLikRatio = 0;
     
     // random walk on log deltas
     
-    vector<double> DeltaUpdateSD = vector<double>(4,0.4);
+    DoubleVec1d DeltaUpdateSD = DoubleVec1d(4,0.4);
     double h=rnorm(0,DeltaUpdateSD[deltaparam]);
     
     if(deltaparam != 2){
-      NewDelta[deltaparam] *= exp(h); // add h to log alpha
+      NewDelta[deltaparam] *= std::exp(h); // add h to log alpha
     }
     else{
       NewDelta[deltaparam] += h;
@@ -2241,7 +2218,7 @@ static void update_Delta(const Config& config, State& state, vector<double> & De
 	for(int s = 0; s<=r; s++){
           NewPsi[r][k] += NewM[r + s * config.numRegion] * Y[s][k];
         }
-	NewExpPsi[r][k] = exp(NewPsi[r][k]);
+	NewExpPsi[r][k] = std::exp(NewPsi[r][k]);
 	NewSumExpPsi[r] += NewExpPsi[r][k];
       }
     }
@@ -2250,10 +2227,10 @@ static void update_Delta(const Config& config, State& state, vector<double> & De
     for (int ind = 0; ind < config.numInd; ind++) {
       int r = Region[ind];
       int k = Species[ind];
-      LogLikRatio += log( (NewExpPsi[r][k]/NewSumExpPsi[r]) / (ExpPsi[r][k]/SumExpPsi[r]) );
+      LogLikRatio += std::log( (NewExpPsi[r][k]/NewSumExpPsi[r]) / (ExpPsi[r][k]/SumExpPsi[r]) );
     }
 
-    double A = exp(LogLikRatio); // acceptance prob
+    double A = std::exp(LogLikRatio); // acceptance prob
     
     if(distr(eng)<A ){ //accept move 
       state.delta[deltaparam].accept += 1;
@@ -2293,9 +2270,8 @@ static double calcNewdivLogLik(const Config& config, int r, int k, int l, int j,
   return sum;
 }
 
-
 // update the Xs for a particular allele and locus, in a particular species, across all regions at once
-static void update_XJoint(const Config& config, State& state, vector<double> & Alpha, DoubleVec4d& X, const DoubleVec2d& Mu, const DoubleVec3d& Nu, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& LogLik, DoubleVec3d& SumExpTheta, const IntVec4d& Count, const IntVec3d& SumCount, DoubleVec1d& L)
+static void update_XJoint(const Config& config, State& state, const DoubleVec1d& Alpha, DoubleVec4d& X, const DoubleVec2d& Mu, const DoubleVec3d& Nu, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& LogLik, DoubleVec3d& SumExpTheta, const IntVec4d& Count, const IntVec3d& SumCount, DoubleVec1d& L)
 {
 
   // These do not need initialization as are initialized at use
@@ -2328,13 +2304,13 @@ static void update_XJoint(const Config& config, State& state, vector<double> & A
           for (int s = 0; s <= r; s++) {
             NewTheta[r] += L[r + s * config.numRegion] * NewX[s];
           }
-          NewExpTheta[r] = exp(NewTheta[r]);
+          NewExpTheta[r] = std::exp(NewTheta[r]);
 	  NewSumExpTheta[r] = SumExpTheta[r][k][l] - ExpTheta[r][k][l][j] + NewExpTheta[r];
 	  
 	  NewLogLik[r] = LogLik[r][k][l] 
 	    + Count[r][k][l][j] * (NewTheta[r] - Theta[r][k][l][j]) 
 	    - SumCount[r][k][l] * 
-	    (log(NewSumExpTheta[r]) - log(SumExpTheta[r][k][l]));
+	    (std::log(NewSumExpTheta[r]) - std::log(SumExpTheta[r][k][l]));
 	  LogLikRatio += (NewLogLik[r] - LogLik[r][k][l])/config.temperature; // Likelihood ratio part of acceptance ratio
         }
 
@@ -2346,7 +2322,7 @@ static void update_XJoint(const Config& config, State& state, vector<double> & A
 	    LogLikRatio -= 0.5 * (X[r][k][l][j] - backpropmean)*(X[r][k][l][j] - backpropmean)/(h*h); // top part of Hastings ratio
           }
         }
-	double A = exp(LogLikRatio); // acceptance prob
+	double A = std::exp(LogLikRatio); // acceptance prob
 	state.x.attempt += 1;
 	
 	if(distr(eng)<A ){ //accept move 
@@ -2365,7 +2341,7 @@ static void update_XJoint(const Config& config, State& state, vector<double> & A
 }
 
 // update each X individually (better acceptance rate/ larger proposal variance,// but more likelihood evaluations!)
-static void update_XSingle(const Config& config, State& state, vector<double> & Alpha, DoubleVec4d& X, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& LogLik, DoubleVec3d& SumExpTheta, const IntVec4d& Count, const IntVec3d& SumCount, DoubleVec1d&  L)
+static void update_XSingle(const Config& config, State& state, const DoubleVec1d& Alpha, DoubleVec4d& X, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& LogLik, DoubleVec3d& SumExpTheta, const IntVec4d& Count, const IntVec3d& SumCount, DoubleVec1d& L)
 {
   static DoubleVec1d NewTheta(config.numRegion, 0.0);
   static DoubleVec1d NewExpTheta(config.numRegion, 0.0);
@@ -2386,7 +2362,7 @@ static void update_XSingle(const Config& config, State& state, vector<double> & 
    }
   if( ValidateAssumptions ) {
     if (RecursionCheck++ > 1 || config.numRegion != FirstNREGION) {
-      cerr << "Assumption violated" << endl;
+      std::cerr << "Assumption violated" << std::endl;
       exit(1);
     }
    }
@@ -2408,12 +2384,12 @@ static void update_XSingle(const Config& config, State& state, vector<double> & 
 
           for (int s = r; s < config.numRegion; s++) {
             NewTheta[s] = Theta[s][k][l][j] + L[s+r*config.numRegion] * (NewX - X[r][k][l][j]);
-	          NewExpTheta[s] = exp(NewTheta[s]);
+	          NewExpTheta[s] = std::exp(NewTheta[s]);
 	          NewSumExpTheta[s] = SumExpTheta[s][k][l] - ExpTheta[s][k][l][j] + NewExpTheta[s];
 	          NewLogLik[s] = LogLik[s][k][l] 
 	            + Count[s][k][l][j] * (NewTheta[s] - Theta[s][k][l][j]) 
 	            - SumCount[s][k][l] * 
-	            (log(NewSumExpTheta[s]) - log(SumExpTheta[s][k][l]));
+	            (std::log(NewSumExpTheta[s]) - std::log(SumExpTheta[s][k][l]));
 	            LogLikRatio += (NewLogLik[s] - LogLik[s][k][l])/config.temperature; // Likelihood ratio part of acceptance ratio
           }
 
@@ -2424,7 +2400,7 @@ static void update_XSingle(const Config& config, State& state, vector<double> & 
 	          LogLikRatio -= 0.5 * (X[r][k][l][j] - backpropmean)*(X[r][k][l][j] - backpropmean)/(h*h); // top part of Hastings ratio
 	        }
 
-	        double A = exp(LogLikRatio); // acceptance prob
+	        double A = std::exp(LogLikRatio); // acceptance prob
 	        state.x.attempt +=1;
 
           if (distr(eng) < A) { // accept move
@@ -2445,7 +2421,7 @@ static void update_XSingle(const Config& config, State& state, vector<double> & 
 }
 
 // update each Y individually (better acceptance rate/ larger proposal variance,// but more likelihood evaluations!)
-static void update_YSingle(const Config& config, State& state, vector<double> & Delta, DoubleVec2d& Y, DoubleVec2d& Psi, DoubleVec2d& ExpPsi, DoubleVec1d& SumExpPsi, vector<int> & Region, vector<int> & Species, DoubleVec1d& M)
+static void update_YSingle(const Config& config, State& state, const DoubleVec1d& Delta, DoubleVec2d& Y, DoubleVec2d& Psi, DoubleVec2d& ExpPsi, DoubleVec1d& SumExpPsi, const IntVec1d& Region, const IntVec1d& Species, const DoubleVec1d& M)
 {
   // These do not need initialization as are initialized inline
   static DoubleVec1d NewPsi(config.numRegion, 0.0);
@@ -2465,7 +2441,7 @@ static void update_YSingle(const Config& config, State& state, vector<double> & 
 
       for (int s = r; s < config.numRegion; s++) {
         NewPsi[s] = Psi[s][k] + M[s + r * config.numRegion] * (NewY - Y[r][k]);
-        NewExpPsi[s] = exp(NewPsi[s]);
+        NewExpPsi[s] = std::exp(NewPsi[s]);
         NewSumExpPsi[s] = SumExpPsi[s] - ExpPsi[s][k] + NewExpPsi[s];
       }
 
@@ -2475,11 +2451,11 @@ static void update_YSingle(const Config& config, State& state, vector<double> & 
 	if(r0 >= r){
 	  if(Species[ind] == k)
 	    LogLikRatio += NewPsi[r0] - Psi[r0][k];
-	  LogLikRatio += log(SumExpPsi[r0]) - log(NewSumExpPsi[r0]);
+	  LogLikRatio += std::log(SumExpPsi[r0]) - std::log(NewSumExpPsi[r0]);
 	}
       }
 
-      double A = exp(LogLikRatio); // acceptance prob
+      double A = std::exp(LogLikRatio); // acceptance prob
       
       state.y.attempt += 1;
       
@@ -2496,8 +2472,7 @@ static void update_YSingle(const Config& config, State& state, vector<double> & 
   }
 }
 
-
-static void DoAllUpdates(const Config& config, State& state, DoubleVec4d& X, double & Beta,  vector<double> & Gamma, vector<double> & Alpha, DoubleVec2d& Mu, DoubleVec3d& Nu, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& LogLik, DoubleVec3d& SumExpTheta, IntVec4d& Count, IntVec3d& SumCount, DoubleVec1d& L, vector<vector<vector<int> > > & Genotype, vector<int> & Region, vector<int> & Species, vector<vector<double> > & Pi, vector<double> & Xcoord, vector<double> & Ycoord, DoubleVec2d& Y, double & Eta, vector<double> & Delta, DoubleVec1d& Lambda, DoubleVec2d& Psi, DoubleVec2d& ExpPsi, DoubleVec1d& SumExpPsi, DoubleVec1d& M, vector<double> & BoundaryX, vector<double> & BoundaryY, const Mapgrid& mymapgrid )
+static void DoAllUpdates(const Config& config, State& state, DoubleVec4d& X, double& Beta, DoubleVec1d& Gamma, DoubleVec1d& Alpha, DoubleVec2d& Mu, DoubleVec3d& Nu, DoubleVec4d& Theta, DoubleVec4d& ExpTheta, DoubleVec3d& LogLik, DoubleVec3d& SumExpTheta, IntVec4d& Count, IntVec3d& SumCount, DoubleVec1d& L, IntVec3d& Genotype, const IntVec1d& Region, IntVec1d& Species, DoubleVec2d& Pi, DoubleVec1d& Xcoord, DoubleVec1d& Ycoord, DoubleVec2d& Y, double& Eta, DoubleVec1d& Delta, DoubleVec1d& Lambda, DoubleVec2d& Psi, DoubleVec2d& ExpPsi, DoubleVec1d& SumExpPsi, DoubleVec1d& M, const DoubleVec1d& BoundaryX, const DoubleVec1d& BoundaryY, const Mapgrid& mymapgrid )
 {
   if (config.updateBeta)
     update_Beta(config,Beta,Mu);
@@ -2558,11 +2533,11 @@ static void InitialiseTheta(const Config& config, DoubleVec4d& Theta, const Doub
   }
 }
 
-static void Initialise(const Config& config, DoubleVec4d& X, double & Beta,  vector<double> & Gamma, vector<double> & Alpha, DoubleVec2d& Mu, DoubleVec3d& Nu, DoubleVec4d& Theta, DoubleVec1d& L, vector<double> & Xcoord, vector<double> & Ycoord) {
+static void Initialise(const Config& config, DoubleVec4d& X, double Beta, DoubleVec1d& Gamma, const DoubleVec1d& Alpha, DoubleVec2d& Mu, DoubleVec3d& Nu, DoubleVec4d& Theta, DoubleVec1d& L, const DoubleVec1d& Xcoord, const DoubleVec1d& Ycoord) {
 
   calc_L(config,L,Alpha,Xcoord,Ycoord);
   
-  Gamma = vector<double>(config.numSpecies,0.3); // Gamma[k] is 1/variance of Nu[k]
+  Gamma = DoubleVec1d(config.numSpecies,0.3); // Gamma[k] is 1/variance of Nu[k]
 
   for (int l = 0; l < config.numLoci; l++) {
     for (int j = 0; j < config.numAllele[l]; j++) {
@@ -2600,66 +2575,66 @@ static void Initialise(const Config& config, DoubleVec4d& X, double & Beta,  vec
 }
 
 
-static void output_empirical_freqs(const Config& config, vector<string> & RegionName,vector<int> & Perm, vector<map<int,int> >& Coding, const IntVec4d& Count, const IntVec3d& SumCount){
-	
- 	cout << "Empirical Frequencies:" << endl;
-    for(int l=0;l<config.numLoci; l++){
-		cout << "Locus " << (l+1) << endl;
-		cout << setw(5) << " " << " : ";
-		OutputRegionNames(config, cout, RegionName, Perm);
+static void output_empirical_freqs(const Config& config, const StringVec1d& RegionName, const IntVec1d& Perm, const MapVec1d& Coding, const IntVec4d& Count, const IntVec3d& SumCount)
+{	
+ 	std::cout << "Empirical Frequencies:" << std::endl;
+  for(int l=0;l<config.numLoci; l++){
+		std::cout << "Locus " << (l+1) << std::endl;
+		std::cout << std::setw(5) << " " << " : ";
+		OutputRegionNames(config, std::cout, RegionName, Perm);
 		for (int allele = 0; allele < config.numAllele[l]; allele++) {
-		    cout << setw(5) << Coding[l][allele] << " : ";
+		    std::cout << std::setw(5) << Coding[l].at(allele) << " : ";
         for (int r = 0; r < config.numRegion; r++) {
-          cout << std::fixed << setprecision(3) << setw(10)
+          std::cout << std::fixed << std::setprecision(3) << std::setw(10)
                 << (1.0 * Count[Perm[r]][0][l][allele]) << "/"
                 << SumCount[Perm[r]][0][l] << " ";
         }
-        cout << endl;
+        std::cout << std::endl;
 		}
 	}
 }
 
-static void OutputMeanFreq(const Config& config, ofstream & freqFile, vector<string> & RegionName, vector<int> & Perm, vector<map<int,int> >& Coding, const DoubleVec4d& MeanFreq )
+static void OutputMeanFreq(const Config& config, std::ofstream& freqFile, const StringVec1d& RegionName, const IntVec1d& Perm, const MapVec1d& Coding, const DoubleVec4d& MeanFreq)
 {
-  freqFile << "Posterior Mean Freqs:" << endl;
+  freqFile << "Posterior Mean Freqs:" << std::endl;
   for (int l = 0; l < config.numLoci; l++) {
-    freqFile << "Locus " << (l+1) << endl;
-    freqFile << setw(5) << " " << " : ";
+    freqFile << "Locus " << (l+1) << std::endl;
+    freqFile << std::setw(5) << " " << " : ";
     OutputRegionNames(config, freqFile, RegionName, Perm);
     for (int allele = 0; allele < config.numAllele[l]; allele++) {
-      freqFile << setw(5) << Coding[l][allele] << " : ";
+      freqFile << std::setw(5) << Coding[l].at(allele) << " : ";
       for (int r = 0; r < config.numRegion - config.locate; r++) {
         double f = MeanFreq[Perm[r]][0][l][allele];
         if (f < 1e-4)
           f = 0;
-        freqFile << std::fixed << setprecision(3) << setw(10) << f
+        freqFile << std::fixed << std::setprecision(3) << std::setw(10) << f
                  << " ";
       }
-      freqFile << endl;
+      freqFile << std::endl;
     }
   }
 }
 
-static string ToString(double number)
+static std::string ToString(double number)
 {
-    if (numeric_limits<double>::has_infinity)
+    if (std::numeric_limits<double>::has_infinity)
     {
-        if (number == numeric_limits<double>::infinity())
+        if (number == std::numeric_limits<double>::infinity())
         {
             return "inf";
         }
-        if (number == -numeric_limits<double>::infinity())
+        if (number == -std::numeric_limits<double>::infinity())
         {
             return "-inf";
         }
     }
-    if (isnan(number))
+    if (std::isnan(number))
     {
         return "nan";
     }
-    ostringstream ostr;
+    std::ostringstream ostr;
     ostr << number;
-    string s(ostr.str());
+    std::string s(ostr.str());
     return s;
 }
 
@@ -2689,10 +2664,10 @@ static void cholesky_in_place(DoubleVec1d& myL, int nregion) {
   }
 }
 
-int main ( int argc, char** argv)
+int main (int argc, char** argv)
 {    
   // MENU PROCESSING PHASE
-  cout << "SCAT version " << VERSION << endl;
+  std::cout << "SCAT version " << VERSION << std::endl;
   struct Config config;
   while( ( argc > 1 ) && ( argv[1][0] == '-' ) ) {
     switch(argv[1][1]) {
@@ -2703,10 +2678,10 @@ int main ( int argc, char** argv)
 
     case 'A':
       config.locate = true;
-      ++argv; --argc; config.firstSampleToLocate = atoi(&argv[1][0])-1;
-      ++argv; --argc; config.lastSampleToLocate = atoi(&argv[1][0])-1;
-      cout << "Locating Samples " << config.firstSampleToLocate+1 << " to " << config.lastSampleToLocate+1 << endl;
-      cout << "FIRST " << config.firstSampleToLocate << " LAST " << config.lastSampleToLocate << endl;
+      ++argv; --argc; config.firstSampleToLocate = std::stoi(&argv[1][0])-1;
+      ++argv; --argc; config.lastSampleToLocate = std::stoi(&argv[1][0])-1;
+      std::cout << "Locating Samples " << config.firstSampleToLocate+1 << " to " << config.lastSampleToLocate+1 << std::endl;
+      std::cout << "FIRST " << config.firstSampleToLocate << " LAST " << config.lastSampleToLocate << std::endl;
       break;
  
     case 'b':
@@ -2719,7 +2694,7 @@ int main ( int argc, char** argv)
       break;
 
     case 'C':
-      ++argv; --argc; config.skipCol = atoi(&argv[1][0]);
+      ++argv; --argc; config.skipCol = std::stoi(&argv[1][0]);
       break;
 
     case 'D':
@@ -2750,17 +2725,17 @@ int main ( int argc, char** argv)
 
     case 'g':
       ++argv; --argc; config.gridFile = std::string(argv[1]);
-      cout << "-g " << config.gridFile << endl;
+      std::cout << "-g " << config.gridFile << std::endl;
       break;
 
     case 'h':
       ++argv; --argc; config.xProposalFactor = atof(&argv[1][0]);
-      cout << "X proposal factor = " << config.xProposalFactor << endl;
+      std::cout << "X proposal factor = " << config.xProposalFactor << std::endl;
       break;
     
     case 'H':
       // this is the "no space" syntax
-      config.hybridCheck = atoi(&argv[1][2]);
+      config.hybridCheck = std::stoi(&argv[1][2]);
       break;
      
     case 'i':
@@ -2790,7 +2765,7 @@ int main ( int argc, char** argv)
 
     case 'n':
       // DEBUG, disabled as part of undeveloped multi-species machinery
-      cout << "option 'n' [disable nu updated] disabled at this time" << endl;
+      std::cout << "option 'n' [disable nu updated] disabled at this time" << std::endl;
       // config.updateNu =0;
       break;
 
@@ -2802,7 +2777,7 @@ int main ( int argc, char** argv)
 
     case 'p':
       // this is the "no space" syntax
-      config.pseudocount = atoi(&argv[1][2]);
+      config.pseudocount = std::stoi(&argv[1][2]);
       break;
 
     case 'r':
@@ -2814,8 +2789,8 @@ int main ( int argc, char** argv)
       break;
 
     case 'S':
-      ++argv; --argc; config.seed = atoi(&argv[1][0]); config.seedSet = true;
-      cout << "SEED " << config.seed << endl;
+      ++argv; --argc; config.seed = std::stoi(&argv[1][0]); config.seedSet = true;
+      std::cout << "SEED " << config.seed << std::endl;
       break;
 
     case 'v':
@@ -2842,12 +2817,12 @@ int main ( int argc, char** argv)
       break;
       
     case 'Z':
-      cout << "-Z" << endl;
+      std::cout << "-Z" << std::endl;
       config.useSubregion = true;
       break;
 
     default: 
-      cerr << "Error: option " << argv[1] << "unrecognized" << endl;
+      std::cerr << "Error: option " << argv[1] << "unrecognized" << std::endl;
       return 1;
     
     }
@@ -2874,9 +2849,9 @@ int main ( int argc, char** argv)
   }
 
   if (argc < 5) {
-    cerr << "Usage is ./SCAT genotypefile locationfile outputdir NLOCI Niter Nthin Nburn " << endl;
-    cerr << "Niter, Nthin and Nburn are optional" << endl;
-    cerr << "See instructions for all additional options" << endl;
+    std::cerr << "Usage is ./SCAT genotypefile locationfile outputdir NLOCI Niter Nthin Nburn " << std::endl;
+    std::cerr << "Niter, Nthin and Nburn are optional" << std::endl;
+    std::cerr << "See instructions for all additional options" << std::endl;
     exit(1);
   }
 
@@ -2887,24 +2862,24 @@ int main ( int argc, char** argv)
     eng.seed(std::random_device()());
   }
 
-  cout << argv[1] << endl;
+  std::cout << argv[1] << std::endl;
   config.genotypeFile = std::string(argv[1]);
   config.regionsFile = std::string(argv[2]);
   config.outputDir = std::string(argv[3]);
   
-  config.numLoci = atoi(argv[4]);
+  config.numLoci = std::stoi(argv[4]);
  
   if (argc > 5) 
-    config.numIter = atoi(argv[5]);
+    config.numIter = std::stoi(argv[5]);
   if (argc > 6)
-    config.numThin = atoi(argv[6]);
+    config.numThin = std::stoi(argv[6]);
   if (argc > 7)
-    config.numBurn = atoi(argv[7]);
+    config.numBurn = std::stoi(argv[7]);
   if (argc > 8)
-    config.numSpecies = atoi(argv[8]);
+    config.numSpecies = std::stoi(argv[8]);
 
   if (config.numSpecies > MAXSPECIES) {
-    cerr << "MAXSPECIES is insufficient: " << config.numSpecies << " needed." << endl;
+    std::cerr << "MAXSPECIES is insufficient: " << config.numSpecies << " needed." << std::endl;
     exit(1);
   }
   
@@ -2938,23 +2913,23 @@ int main ( int argc, char** argv)
 
   // END OF MENU PROCESSING PHASE
 
-  vector<int> Region;
+  IntVec1d Region;
 
   // input genotype data from inputfile
 
-  vector<int> RegionsPresent(0);
+  IntVec1d RegionsPresent(0);
   
-  vector<string> Id(0);
+  StringVec1d Id(0);
 
     // declare memory for Genotype and OriginalGenotype
-  vector<vector<vector<int> > > Genotype;
-  vector<vector<vector<int> > > OriginalGenotype;
+  IntVec3d Genotype;
+  IntVec3d OriginalGenotype;
    
    // Coding[locus][i] is the actual allele that i codes for
-  std::vector<map<int,int> > Coding(config.numLoci);
+  MapVec1d Coding(config.numLoci);
 
-  std::vector<int> NMissing(config.numInd,0); // BUG: config.numInd isn't set by this point
-  vector<int> Species;
+  IntVec1d NMissing(config.numInd,0); // BUG: config.numInd isn't set by this point
+  IntVec1d Species;
 
   input_genotype_data(config,input,Region,Species,OriginalGenotype,NMissing,Id, RegionsPresent,true);
   if (!config.assignFile.empty()) {
@@ -2972,20 +2947,20 @@ int main ( int argc, char** argv)
     output_genotypes(config,OriginalGenotype,Id);
   recode_genotypes(config,OriginalGenotype,Genotype,Coding,config.numAllele);
   if (config.echoInputs) {
-    cout << "Number of Alleles at each locus:" << endl;
+    std::cout << "Number of Alleles at each locus:" << std::endl;
     int j=1;
-    cout << "Locus : #alleles" << endl;
+    std::cout << "Locus : #alleles" << std::endl;
     for (auto allele : config.numAllele)
-      cout << j++ << " : " << allele << endl;
+      std::cout << j++ << " : " << allele << std::endl;
   } 
   
   config.numRegion = RegionsPresent.size() + config.locate;
   
   if (config.echoInputs) {
-    cout << "Number of Regions: " << config.numRegion << endl;
+    std::cout << "Number of Regions: " << config.numRegion << std::endl;
   }
   
-  vector<int> Perm(config.numRegion,0);
+  IntVec1d Perm(config.numRegion,0);
 
   for (int r = 0; r < config.numRegion; r++)
     Perm[r] = r;
@@ -2995,14 +2970,14 @@ int main ( int argc, char** argv)
   }
 
   if (config.verbose) {
-    cout << "Permutation:" << endl;
+    std::cout << "Permutation:" << std::endl;
     for (int r = 0; r < config.numRegion; r++)
-      cout << Perm[r] << " ";
-    cout << endl;
+      std::cout << Perm[r] << " ";
+    std::cout << std::endl;
   }
 
-  vector<string> RegionName(config.numRegion);
-  std::vector<vector<double>> Pi(config.numRegion,std::vector<double>(config.numSpecies,1.0/config.numSpecies)); // Pi[r][k] is proportion
+  StringVec1d RegionName(config.numRegion);
+  DoubleVec2d Pi(config.numRegion,DoubleVec1d(config.numSpecies,1.0/config.numSpecies)); // Pi[r][k] is proportion
   // of inds at location r that are in species k
   
   // declare memory for X and Y coords of region
@@ -3011,7 +2986,7 @@ int main ( int argc, char** argv)
   DoubleVec1d BoundaryX;
   DoubleVec1d BoundaryY;
   if (!config.boundaryFile.empty()) {
-    cout << "Reading in Boundary data from boundary file " << config.boundaryFile << endl;
+    std::cout << "Reading in Boundary data from boundary file " << config.boundaryFile << std::endl;
     std::ifstream bfile(config.boundaryFile);
     if (!bfile.is_open()) {
       error_and_exit("Could not open boundary file");
@@ -3019,10 +2994,9 @@ int main ( int argc, char** argv)
     ReadInBoundary(config,bfile,BoundaryX,BoundaryY);
   }
 
-  
   Mapgrid mymapgrid;
   if (!config.gridFile.empty()) {
-    cout << "Reading in gridfile data from file " << config.gridFile << endl;
+    std::cout << "Reading in gridfile data from file " << config.gridFile << std::endl;
     std::ifstream gridfile(config.gridFile);
     if (!gridfile.is_open()) {
       error_and_exit("Could not open grid file" + config.gridFile);
@@ -3036,19 +3010,19 @@ int main ( int argc, char** argv)
   } else {
     mapInfoFile << "Using default map information for ";
     if (config.savannahOnly) {
-      mapInfoFile << "Savannah elephants " << endl;
+      mapInfoFile << "Savannah elephants " << std::endl;
     } 
     if (config.forestOnly) {
-      mapInfoFile << "Forest elephants " << endl;
+      mapInfoFile << "Forest elephants " << std::endl;
     }
     if (!config.boundaryFile.empty()) {
-      mapInfoFile << "Custom boundary file " << endl;
+      mapInfoFile << "Custom boundary file " << std::endl;
     }
   }
 
   if (!config.gridFile.empty()) mymapgrid.PrintGrid(mapInfoFile);
 
-  vector<int> SubRegion(config.numRegion,0);
+  IntVec1d SubRegion(config.numRegion,0);
 
   // make a paradigm IntVec4d and DoubleVec4d with ragged inner dimension for
   // number of alleles per locus; these will be copied to initialize all other
@@ -3128,7 +3102,7 @@ int main ( int argc, char** argv)
   DoubleVec4d MeanFittedCor(config.numRegion, DoubleVec3d(config.numSpecies, DoubleVec2d(config.numRegion,
     DoubleVec1d(config.numSpecies,0.0))));
 
-  vector<vector<double> > MeanPi(config.numRegion, vector<double>(config.numSpecies,0.0)); // mean value of Pi
+  DoubleVec2d MeanPi(config.numRegion, DoubleVec1d(config.numSpecies,0.0)); // mean value of Pi
 
   // LogLik[r][k][l] holds the log-likelihood for individuals in region r, 
   // species k, at locus l 
@@ -3139,7 +3113,7 @@ int main ( int argc, char** argv)
       for (int l = 0; l < config.numLoci; l++) {
         for(int j=0;j<config.numAllele[l];j++){	 
           Theta[r][k][l][j] = Mu[l][j] + Nu[k][l][j];
-          ExpTheta[r][k][l][j] = exp(Theta[r][k][l][j]);
+          ExpTheta[r][k][l][j] = std::exp(Theta[r][k][l][j]);
         }
       }
     }
@@ -3154,7 +3128,7 @@ int main ( int argc, char** argv)
   DoubleVec1d Gamma(config.numSpecies, 0.3); // Gamma[k] is 1/variance of Nu[k]
 
   // input data from region file (Xcoords and Ycoords; regions and subregions)
-  input_positions_data(config,regionfile,Xcoord,Ycoord,RegionName,SubRegion,Region,Perm,RegionsPresent);
+  input_positions_data(config,regionfile,Xcoord,Ycoord,RegionName,SubRegion,Perm,RegionsPresent);
   if (config.echoInputs) {
     output_positions_data(RegionName, Region, Xcoord, Ycoord, Id);
   }
@@ -3162,12 +3136,12 @@ int main ( int argc, char** argv)
   // check that all reference regions lie within our species range
   // jyamato may 16, 2022
   bool anybad = false;
-  for(vector<int>::size_type r=0; r<RegionsPresent.size(); ++r) {
+  for(IntVec1d::size_type r=0; r<RegionsPresent.size(); ++r) {
     double radlat = Ycoord[Perm[r]];
     double radlong = Xcoord[Perm[r]];
     if(!InRange(config,radlong,radlat,BoundaryX,BoundaryY,mymapgrid)) {
       anybad = true;
-      string usedmap("NULL");
+      std::string usedmap("NULL");
       if (!config.gridFile.empty()) {
         usedmap = config.gridFile;
       } else {
@@ -3186,14 +3160,14 @@ int main ( int argc, char** argv)
       
       double deglat = to_degrees(radlat);
       double deglong = to_degrees(radlong);
-      string msg = RegionName[Perm[r]] + " at [" + ToString(deglat) + "," + ToString(deglong) + "]";
+      std::string msg = RegionName[Perm[r]] + " at [" + ToString(deglat) + "," + ToString(deglong) + "]";
       msg += " is outside the species boundaries established";
       msg += " by " + usedmap + "\n";
-      cout << msg << endl;
+      std::cout << msg << std::endl;
     }
   }
   if(anybad) {
-    string msg = "One or more populations outside species range:  terminating.";
+    std::string msg = "One or more populations outside species range:  terminating.";
     error_and_exit(msg);
   }
 
@@ -3231,14 +3205,14 @@ int main ( int argc, char** argv)
   bool templocate = config.locate;
   config.locate = false; // don't locate during burnin
 
-  int printdot = max(config.numBurn * config.screenProgressInterval,1.0);
+  int printdot = std::max(config.numBurn * config.screenProgressInterval,1.0);
   int printincr = printdot;
 
   State state;
 
   if (!config.locateWholeRegion) {
-    // cerr << "Performing Global Burn-in iterations" << endl;
-    cout << "Performing Global Burn-in iterations" << flush;
+    // std::cerr << "Performing Global Burn-in iterations" << std::endl;
+    std::cout << "Performing Global Burn-in iterations" << std::flush;
     for (int iter = 0; iter < config.numBurn; iter++) {
       for (int nthin = 0; nthin < config.numThin; nthin++) {
         DoAllUpdates(config,state,X,Beta,Gamma,Alpha,Mu,Nu,Theta,ExpTheta,LogLik,SumExpTheta,Count,SumCount,L,Genotype,Region,Species,Pi,Xcoord,Ycoord,Y,Eta, Delta,Lambda,  Psi,ExpPsi, SumExpPsi, M, BoundaryX, BoundaryY, mymapgrid);
@@ -3253,10 +3227,10 @@ int main ( int argc, char** argv)
       if (config.numSpecies > 1)
         OutputPi(config, Pi, RegionName, piFile, Perm);
        
-      // cerr << "Iteration:" << (iter+1) << "\033[A" << endl;
+      // std::cerr << "Iteration:" << (iter+1) << "\033[A" << std::endl;
       if (iter == printdot) {
         printdot += printincr;
-        cout << "." << flush;
+        std::cout << "." << std::flush;
       }
 
       OutputParameters(config,paramFile,Alpha,Beta,Gamma,Delta,Eta,Lambda,LogLik);
@@ -3267,11 +3241,11 @@ int main ( int argc, char** argv)
 	    xFile << X[r][0][0][a]  << " ";
 	  }
         }
-        xFile << endl;
+        xFile << std::endl;
       }
     }
   }
-  cout << "." << endl;
+  std::cout << "." << std::endl;
 
   config.locate = templocate;
    
@@ -3284,21 +3258,21 @@ int main ( int argc, char** argv)
     for(state.sampleToLocate = config.firstSampleToLocate; state.sampleToLocate <= config.lastSampleToLocate; state.sampleToLocate++){
       
       std::string LOCATEFILE(config.outputDir);
-	  LOCATEFILE.append("/");
+      LOCATEFILE.append("/");
       LOCATEFILE.append( Id[state.sampleToLocate] );
       state.loc.accept = 0;
       state.loc.attempt = 0;
 
-      ofstream locatefile (LOCATEFILE.c_str());
+      std::ofstream locatefile(LOCATEFILE);
       
-      // cerr << "Individual:" << (sampleToLocate+1) << endl;      
-      string outname = Id[state.sampleToLocate];
+      // std::cerr << "Individual:" << (sampleToLocate+1) << std::endl;      
+      std::string outname = Id[state.sampleToLocate];
       if (outname.length() > config.maxOutCharsInName) {
         int diff = outname.length() - config.maxOutCharsInName;
         outname.erase(config.maxOutCharsInName,diff);
       }
-      // cout << "Individual: " << outname << endl;
-      cout << "Individual: " << outname << flush;
+      // std::cout << "Individual: " << outname << std::endl;
+      std::cout << "Individual: " << outname << std::flush;
 
       // reset theta, counts, etc, ignoring individual ind
       state.trueRegion = Region[state.sampleToLocate];
@@ -3310,10 +3284,10 @@ int main ( int argc, char** argv)
         }
       }
       
-      //cout << "Initialising XY position... ";
-      //cerr << "Initialising XY position... ";
+      //std::cout << "Initialising XY position... ";
+      //std::cerr << "Initialising XY position... ";
       InitialiseXY(config,state,BoundaryX,BoundaryY,Xcoord,Ycoord,mymapgrid);
-      //cerr << "Done" << endl;
+      //std::cerr << "Done" << std::endl;
 
       calc_L(config,L,Alpha,Xcoord,Ycoord);
       count_up_alleles(config,Count,Region,Species,Genotype);
@@ -3344,14 +3318,14 @@ int main ( int argc, char** argv)
       // This one is definitely needed
       calc_LogLik(config,LogLik,Theta,SumExpTheta,Count,SumCount);
        
-      printdot = max(config.numBurn * config.screenProgressInterval,1.0);
+      printdot = std::max(config.numBurn * config.screenProgressInterval,1.0);
       printincr = printdot;
-      cout << "   BurnIn" << flush;
+      std::cout << "   BurnIn" << std::flush;
 
       for (int iter = 0; iter < config.numBurn; iter++) {
-        // cout << "Burnin Iteration:" << (iter+1) << "\033[A" << endl;
+        // std::cout << "Burnin Iteration:" << (iter+1) << "\033[A" << std::endl;
         if (iter == printdot) {
-          cout << "." << flush;
+          std::cout << "." << std::flush;
           printdot += printincr;
         }
         for (int nthin = 0; nthin < config.numThin; nthin++) {
@@ -3365,16 +3339,16 @@ int main ( int argc, char** argv)
 	OutputLatLongs(locatefile,Xcoord[config.numRegion-1],Ycoord[config.numRegion-1],sumloglik);
       }
 
-      // cout << endl;
-      cout << "." << "Searching" << flush;
+      // std::cout << std::endl;
+      std::cout << "." << "Searching" << std::flush;
 
-      printdot = max(config.numIter * config.screenProgressInterval,1.0);
+      printdot = std::max(config.numIter * config.screenProgressInterval,1.0);
       printincr = printdot;
 
       for (int iter = 0; iter < config.numIter; iter++) {
-        // cout << "Iteration:" << (iter+1) << "\033[A" << endl;
+        // std::cout << "Iteration:" << (iter+1) << "\033[A" << std::endl;
         if (iter == printdot) {
-          cout << "." << flush;
+          std::cout << "." << std::flush;
           printdot += printincr;
         }
         for (int nthin = 0; nthin < config.numThin; nthin++) {
@@ -3392,7 +3366,7 @@ int main ( int argc, char** argv)
 	
 	totaliter++;
       }
-      cout << "." << endl;
+      std::cout << "." << std::endl;
       
       locatefile << "Acceptance rate: ";
       outputAcceptanceRate(state.loc, locatefile);
@@ -3413,7 +3387,7 @@ int main ( int argc, char** argv)
             Region[i] = state.trueRegion;
         }
       }
-      // cerr << endl;
+      // std::cerr << std::endl;
 
     }
   } else if (config.hybridCheck) {
@@ -3478,9 +3452,9 @@ int main ( int argc, char** argv)
 
     state.x.accept = 0;
     state.x.attempt = 0;
-    // cerr << "Performing Main Iterations " << endl;
-    cout << "Performing Main Iterations" << flush;
-    printdot = max(config.numIter * config.screenProgressInterval,1.0);
+    // std::cerr << "Performing Main Iterations " << std::endl;
+    std::cout << "Performing Main Iterations" << std::flush;
+    printdot = std::max(config.numIter * config.screenProgressInterval,1.0);
     printincr = printdot;
 
     for (int iter = 0; iter < config.numIter; iter++) {
@@ -3495,7 +3469,7 @@ int main ( int argc, char** argv)
 #endif  
       calc_LogLik(config,LogLik,Theta,SumExpTheta,Count,SumCount);
 #ifndef NDEBUG
-      if(!CompareLogLiks(config,LogLik,debug_LogLik)) cerr << "At line 3204" << endl;
+      if(!CompareLogLiks(config,LogLik,debug_LogLik)) std::cerr << "At line 3204" << std::endl;
 #endif
 
       if (config.numSpecies > 1)
@@ -3510,9 +3484,9 @@ int main ( int argc, char** argv)
       // }
       //OutputEstimatedFreqs( ExpTheta, SumExpTheta, output, Coding, Perm);   
       //OutputTheta( MeanX, output, Coding, Perm);
-      //cerr << "Iteration:" << (iter+1) << "\033[A" << endl;
+      //std::cerr << "Iteration:" << (iter+1) << "\033[A" << std::endl;
       if (iter == printdot) {
-        cout << "." << flush;
+        std::cout << "." << std::flush;
         printdot += printincr;
       }
 
@@ -3524,11 +3498,11 @@ int main ( int argc, char** argv)
 	    xFile << X[r][0][0][a] << " ";
 	  }
         }
-        xFile << endl;
+        xFile << std::endl;
       }
     }
-    // cerr << endl;
-    cout << "." << endl;
+    // std::cerr << std::endl;
+    std::cout << "." << std::endl;
   }
 
   NormaliseMeanFreq(config,MeanFreq,totaliter);
@@ -3550,13 +3524,13 @@ int main ( int argc, char** argv)
 
   // output correlations and covariances (fitted and empirical) to corrFile
 
-  corrFile << "location1 location2 distance cov fittedcov corr fittedcorr" << endl;
+  corrFile << "location1 location2 distance cov fittedcov corr fittedcorr" << std::endl;
 
   for (int r0 = 0; r0 < config.numRegion; r0++) {
     for (int k0 = 0; k0 < config.numSpecies; k0++) {
 	  for(int r1=0; r1<=r0; r1++){
 	  for(int k1=0; k1<=k0; k1++){
-	    corrFile << RegionName[r0] << " " << RegionName[r1] << " " << Distance(r0,r1,Xcoord,Ycoord) << " " << MeanCov[r0][k0][r1][k1] << " " << MeanFittedCov[r0][k0][r1][k1]  << " " << MeanCor[r0][k0][r1][k1] << " " << MeanFittedCor[r0][k0][r1][k1]<< " " << endl;
+	    corrFile << RegionName[r0] << " " << RegionName[r1] << " " << Distance(r0,r1,Xcoord,Ycoord) << " " << MeanCov[r0][k0][r1][k1] << " " << MeanFittedCov[r0][k0][r1][k1]  << " " << MeanCor[r0][k0][r1][k1] << " " << MeanFittedCor[r0][k0][r1][k1]<< " " << std::endl;
 	  }
 	}
       }
@@ -3572,19 +3546,19 @@ int main ( int argc, char** argv)
 
   OutputMeanFreq(config,freqFile,RegionName,Perm,Coding,MeanFreq);
 
-  freqFile << "Empirical Freqs:" << endl;
+  freqFile << "Empirical Freqs:" << std::endl;
   for (int l = 0; l < config.numLoci; l++) {
-    freqFile << "Locus " << (l+1) << endl;
-    freqFile << setw(5) << " " << " : ";
+    freqFile << "Locus " << (l+1) << std::endl;
+    freqFile << std::setw(5) << " " << " : ";
     OutputRegionNames(config, freqFile, RegionName, Perm);
     for(int allele=0; allele<config.numAllele[l]; allele++){
-      freqFile << setw(5) << Coding[l][allele] << " : ";
+      freqFile << std::setw(5) << Coding[l][allele] << " : ";
       for (int r = 0; r < config.numRegion - config.locate; r++) {     
-	freqFile << std::fixed << setprecision(3) << setw(10) << (1.0*Count[Perm[r]][0][l][allele])/SumCount[Perm[r]][0][l] << " ";
+        freqFile << std::fixed << std::setprecision(3) << std::setw(10) << (1.0*Count[Perm[r]][0][l][allele])/SumCount[Perm[r]][0][l] << " ";
       }
-      freqFile << endl;
+      freqFile << std::endl;
     }
   }
 
-cout << "Program finished" << endl;
+  std::cout << "Program finished" << std::endl;
 }

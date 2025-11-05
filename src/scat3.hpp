@@ -3,18 +3,9 @@
 
 // SCAT version 3.0.3
 
-#include <string>
-#include <iostream>
-#include <fstream>
-#include <vector>
-#include <cassert>
-#include <cmath>
-#include <algorithm>
-#include <iomanip>
-#include <numeric>
-#include <cmath>
-#include "string.h"
 #include <map>
+#include <string>
+#include <vector>
 
 const double PI = 3.141592; 
 const std::string VERSION="3.0.3";
@@ -34,6 +25,8 @@ typedef std::vector<int> IntVec1d;
 typedef std::vector<IntVec1d> IntVec2d;
 typedef std::vector<IntVec2d> IntVec3d;
 typedef std::vector<IntVec3d> IntVec4d;
+typedef std::vector<std::string> StringVec1d;
+typedef std::vector<std::map<int,int>> MapVec1d;
 
 const int ValidateAssumptions = 1;
 
